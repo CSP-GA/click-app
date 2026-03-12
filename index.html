@@ -1547,7 +1547,7 @@ function calcSLAStatus(lap){
 }
 function saveSLA(){
   const cfg={urgent:parseInt(document.getElementById('mSlaU').value)||30,high:parseInt(document.getElementById('mSlaH').value)||60,medium:parseInt(document.getElementById('mSlaM').value)||120,low:parseInt(document.getElementById('mSlaL').value)||240,warnPct:parseInt(document.getElementById('mSlaWarn').value)||80};
-  DB.set('slaConfig',cfg);showToast('✅ Target SLA disimpan');previewSLA();
+  DB.set('slaConfig',cfg);pushToServer('slaConfig',cfg);showToast('✅ Target SLA disimpan');previewSLA();
 }
 function resetSLA(){
   DB.set('slaConfig',null);
@@ -1926,9 +1926,9 @@ function saveUser(){
     k.push({id:nid,nama:n,role:document.getElementById('uR').value,area:document.getElementById('uA').value,vendor:document.getElementById('uV').value,pin:p,phone:document.getElementById('uH').value,aktif:true});
     showToast('✅ Karyawan ditambahkan');
   }
-  DB.set('karyawan',k);rKary();closeModal('mUser');populateLoginDropdown();
+  DB.set('karyawan',k);pushToServer('karyawan',k);rKary();closeModal('mUser');populateLoginDropdown();
 }
-function delUser(id){if(CU&&CU.id===id){showToast('⚠ Tidak bisa hapus akun sendiri');return;}DB.set('karyawan',(DB.get('karyawan')||[]).filter(x=>x.id!==id));rKary();showToast('🗑 Karyawan dihapus');}
+function delUser(id){if(CU&&CU.id===id){showToast('⚠ Tidak bisa hapus akun sendiri');return;}const _dk=(DB.get('karyawan')||[]).filter(x=>x.id!==id);DB.set('karyawan',_dk);pushToServer('karyawan',_dk);rKary();showToast('🗑 Karyawan dihapus');}
 let editAID=null;
 function openAddArea(){editAID=null;document.getElementById('mATtl').textContent='Tambah Area';['aN','aLt','aZ','aZ2'].forEach(id=>document.getElementById(id).value='');openModal('mArea');}
 function editArea(id){
@@ -1953,10 +1953,10 @@ function saveArea(){
     a.push({id:Math.max(0,...a.map(x=>x.id))+1,nama:n,lantai:lt,zona:document.getElementById('aZ').value,keterangan:document.getElementById('aZ2').value});
     showToast('✅ Area ditambahkan');
   }
-  DB.set('area',a);rArea();closeModal('mArea');
+  DB.set('area',a);pushToServer('area',a);rArea();closeModal('mArea');
 }
-function delLap(id){if(!confirm('Hapus laporan ini?'))return;DB.set('laporan',(DB.get('laporan')||[]).filter(x=>x.id!==id));rLap();showToast('🗑 Laporan dihapus');}
-function delArea(id){DB.set('area',(DB.get('area')||[]).filter(x=>x.id!==id));rArea();showToast('🗑 Area dihapus');}
+function delLap(id){if(!confirm('Hapus laporan ini?'))return;const _dl=(DB.get('laporan')||[]).filter(x=>x.id!==id);DB.set('laporan',_dl);pushToServer('laporan',_dl);rLap();showToast('🗑 Laporan dihapus');}
+function delArea(id){const _da=(DB.get('area')||[]).filter(x=>x.id!==id);DB.set('area',_da);pushToServer('area',_da);rArea();showToast('🗑 Area dihapus');}
 function popAreaSel(sid,sel){
   const a=DB.get('area')||[],s=document.getElementById(sid);
   s.innerHTML=a.map(x=>`<option value="${x.nama} ${x.lantai}"${sel===x.nama+' '+x.lantai?' selected':''}>${x.nama} ${x.lantai}</option>`).join('');
@@ -2391,6 +2391,7 @@ function ambilTugas(id){
   l[i].status='IN PROGRESS';
   l[i].assignedBy=null; // diambil sendiri, bukan di-assign supervisor
   DB.set('laporan',l);
+  pushToServer('laporan',l);
   showToast('✋ Tugas diambil! Silakan kerjakan.');
   setTimeout(()=>rStaff(),300);
 }
@@ -2408,6 +2409,7 @@ function submitTask(id){
     l[i].fotoAfter=camStore[id]?.after||'✨';
     l[i].sla=calcSLAStatus(l[i]);
     DB.set('laporan',l);
+    pushToServer('laporan', l);
   }
   showToast('🚀 Laporan dikirim! SLA tercatat ✓');
   setTimeout(()=>rStaff(),300);
@@ -2624,7 +2626,8 @@ function assignStaff(id){
   const lap=l[i];
   const hasBefore=!!(camStore[id]?.before||lap?.fotoBefore);
   if(!hasBefore){showToast('⚠ Foto before wajib diambil sebelum menugaskan staff');return;}
-  if(i>=0){l[i].staff=sel.value;l[i].status='IN PROGRESS';l[i].supervisor=CU.nama;l[i].assignedBy=CU.nama;DB.set('laporan',l);showToast('✅ '+sel.value+' ditugaskan');setTimeout(()=>rSpv(),300);}
+  if(i>=0){l[i].staff=sel.value;l[i].status='IN PROGRESS';l[i].supervisor=CU.nama;l[i].assignedBy=CU.nama;DB.set('laporan',l);
+  pushToServer('laporan', DB.get('laporan')||[]);showToast('✅ '+sel.value+' ditugaskan');setTimeout(()=>rSpv(),300);}
 }
 function mkVCard(l){
   var sla=l.sla==='OK'?'p-ok':l.sla==='WARN'?'p-warn':'p-breach';
@@ -2772,6 +2775,7 @@ async function approveReg(id, nama){
   const newUser={id:newId,nama,pin:reg?.pin||'0000',phone,role,posisi,area:posisi,vendor:'-',shift:'Full Day',aktif:true,status:'active'};
   users.push(newUser);
   DB.set('karyawan',users);
+  pushToServer('karyawan',users);
 
   // Update status registrasi lokal
   const regsUpd=JSON.parse(localStorage.getItem('click_registrations')||'[]');
@@ -2922,13 +2926,33 @@ function pKpiClick(filter){
   const medal=['🥇','🥈','🥉'];
   listEl.innerHTML=list.map((s,i)=>{
     const rc=s.rate>=80?'var(--green)':s.rate>=50?'var(--orange)':'var(--red)';
-    return `<div style="display:flex;align-items:center;padding:12px 18px;border-bottom:1px solid var(--line1);gap:12px;">
-      <div style="width:28px;text-align:center;font-size:20px;">${medal[i]||'<span style=\'color:var(--t3);font-size:14px;\'>'+(i+1)+'</span>'}</div>
-      <div style="flex:1;"><div style="font-size:16px;font-weight:600;color:var(--t1);">${s.u.nama}</div><div style="font-size:13px;color:var(--t3);">${s.u.area||s.u.posisi||'-'}</div></div>
-      <div style="text-align:center;min-width:55px;"><div style="font-size:18px;font-weight:800;color:${rc};">${s.rate}%</div><div style="font-size:12px;color:var(--t3);">completion</div></div>
-      <div style="text-align:center;min-width:45px;"><div style="font-size:16px;font-weight:700;color:var(--t1);">${s.done}/${s.total}</div><div style="font-size:12px;color:var(--t3);">tugas</div></div>
-      <div style="text-align:center;min-width:40px;"><div style="font-size:16px;font-weight:700;color:var(--red);">${s.breach}</div><div style="font-size:12px;color:var(--t3);">breach</div></div>
-      ${s.avgRating?`<div style="text-align:center;min-width:40px;"><div style="font-size:16px;font-weight:700;color:var(--yellow);">⭐${s.avgRating}</div><div style="font-size:12px;color:var(--t3);">rating</div></div>`:''}
+    return `<div style="padding:12px 14px;border-bottom:1px solid var(--line1);">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="width:26px;text-align:center;font-size:18px;flex-shrink:0;">${medal[i]||'<span style=\'color:var(--t3);font-size:13px;\'>'+(i+1)+'</span>'}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:15px;font-weight:700;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${s.u.nama}</div>
+          <div style="font-size:12px;color:var(--t3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${s.u.area||s.u.posisi||'-'}</div>
+        </div>
+        <div style="text-align:center;flex-shrink:0;">
+          <div style="font-size:20px;font-weight:800;color:${rc};">${s.rate}%</div>
+          <div style="font-size:11px;color:var(--t3);">selesai</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px;padding-left:36px;">
+        <div style="flex:1;background:var(--bg3);border-radius:6px;padding:5px 8px;text-align:center;">
+          <div style="font-size:14px;font-weight:700;color:var(--t1);">${s.done}/${s.total}</div>
+          <div style="font-size:11px;color:var(--t3);">tugas</div>
+        </div>
+        <div style="flex:1;background:var(--bg3);border-radius:6px;padding:5px 8px;text-align:center;">
+          <div style="font-size:14px;font-weight:700;color:var(--red);">${s.breach}</div>
+          <div style="font-size:11px;color:var(--t3);">breach</div>
+        </div>
+        ${s.avgRating?`<div style="flex:1;background:var(--bg3);border-radius:6px;padding:5px 8px;text-align:center;"><div style="font-size:14px;font-weight:700;color:var(--yellow);">⭐${s.avgRating}</div><div style="font-size:11px;color:var(--t3);">rating</div></div>`:''}
+        <div style="flex:2;background:var(--bg3);border-radius:6px;padding:5px 8px;">
+          <div style="height:6px;background:var(--bg5);border-radius:3px;margin-top:4px;"><div style="height:100%;width:${s.rate}%;background:${rc};border-radius:3px;transition:width .4s;"></div></div>
+          <div style="font-size:11px;color:var(--t3);margin-top:3px;">progress</div>
+        </div>
+      </div>
     </div>`;
   }).join('');
 }
@@ -3058,14 +3082,14 @@ function saveCatatan(){
   if(_catatanId===null)return;
   const l=DB.get('laporan')||[],i=l.findIndex(r=>r.id===_catatanId);
   const val=document.getElementById('catatanInput').value.trim();
-  if(i>=0){l[i].catatan=val;DB.set('laporan',l);}
+  if(i>=0){l[i].catatan=val;DB.set('laporan',l);pushToServer('laporan',l);}
   closeModal('mCatatan');
   showToast(val?'💬 Catatan disimpan':'🗑 Catatan dihapus');
   setTimeout(()=>rSpv(),200);
 }
 function setRating(id,val){
   const l=DB.get('laporan')||[],i=l.findIndex(x=>x.id===id);
-  if(i>=0){l[i].rating=val;DB.set('laporan',l);}
+  if(i>=0){l[i].rating=val;DB.set('laporan',l);pushToServer('laporan',l);}
   const row=document.getElementById('sr-'+id);
   if(row)row.querySelectorAll('.star').forEach((s,i2)=>{s.style.color=i2<val?'var(--yellow)':'var(--t4)';s.textContent=i2<val?'★':'☆';});
   const sc=document.getElementById('sc-'+id);if(sc)sc.textContent=val+'/5';
@@ -3084,6 +3108,7 @@ function verifyTask(id){
     // Jika sudah SELESAI dan sebelumnya BREACH, tetap catat sebagai BREACH (terlambat)
     // status tetap SELESAI, isBreach tetap true sebagai catatan historis
     DB.set('laporan',l);
+    pushToServer('laporan', l);
   }
   showToast('✅ Laporan diverifikasi ✓');setTimeout(()=>rSpv(),300);
 }
@@ -3126,6 +3151,7 @@ function submitEskalasi(){
     l[i].eskalasiAt=new Date().toLocaleString('id-ID');
     l[i].eskalasiNote=note||'-';
     DB.set('laporan',l);
+    pushToServer('laporan',l);
   }
   closeModal('mEskalasi');
   showToast('🚨 Eskalasi berhasil · '+staffVal+' ditugaskan');
@@ -3168,6 +3194,9 @@ function camConfirm(){
       if(camType==='before'&&camStore[camTask]?.before){l[i].fotoBefore=camStore[camTask].before;}
       if(camType==='after'&&camStore[camTask]?.after){l[i].fotoAfter=camStore[camTask].after;}
       DB.set('laporan',l);
+      // Push tanpa base64 foto agar tidak oversize
+      const _lSrv=l.map(x=>({...x,fotoBefore:x.fotoBefore?.startsWith('data:')?'[foto]':x.fotoBefore,fotoAfter:x.fotoAfter?.startsWith('data:')?'[foto]':x.fotoAfter}));
+      pushToServer('laporan',_lSrv);
     }
   }
   if(isSpvRole&&!isStaffRole){setTimeout(()=>rSpv(),200);}
@@ -3296,10 +3325,15 @@ function saveLaporan(){
     fotoBefore: _lapBeforeData, fotoAfter:null
   });
   DB.set('laporan',l);
+  // Push ke server agar semua device sync
+  // Foto base64 bisa besar — simpan tanpa foto dulu ke server, foto tetap di lokal
+  const lForServer = l.map(x=>({...x, fotoBefore: x.fotoBefore&&x.fotoBefore.startsWith('data:')?'[foto]':x.fotoBefore, fotoAfter: x.fotoAfter&&x.fotoAfter.startsWith('data:')?'[foto]':x.fotoAfter}));
+  pushToServer('laporan', lForServer);
   _lapBeforeData=null;
   closeModal('mLaporan');
   showToast('✅ Laporan dibuat · Foto Before tersimpan');
-  rSpv();
+  // Refresh view sesuai role
+  if(CU.role==='staff') rStaff(); else rSpv();
 }
 
 // ══════════════════════════════════════════════
@@ -3378,6 +3412,7 @@ function submitKlaim(){
     fotoBefore:_klaimFotoBefore||null, fotoAfter:_klaimFotoAfter||null
   });
   DB.set('klaims',klaims);
+  pushToServer('klaims',klaims);
   closeModal('mKlaim');
   showToast('✅ Klaim terkirim! Menunggu persetujuan Manager.');
   rSpv();
@@ -3463,11 +3498,13 @@ function putusKlaim(action){
       fotoBefore:k.fotoBefore||null, fotoAfter:k.fotoAfter||null
     });
     DB.set('laporan',laps);
+    pushToServer('laporan',laps);
     showToast('✅ Klaim disetujui & masuk ke laporan');
   } else {
     showToast('❌ Klaim ditolak'+(note?' — '+note:''));
   }
   DB.set('klaims',klaims);
+  pushToServer('klaims',klaims);
   closeModal('mReviewKlaim');
   rManager();
   // Cek apakah masih ada pending klaim
@@ -3505,7 +3542,7 @@ function autoBreachCheck(){
   });
   if(changed){
     DB.set('laporan', laps);
-
+    pushToServer('laporan', laps);
   }
 }
 
@@ -3518,6 +3555,7 @@ function saveWeekend(){
   cfg.sabtu=document.getElementById('cbSabtu')?.checked||false;
   cfg.minggu=document.getElementById('cbMinggu')?.checked||false;
   DB.set('liburConfig',cfg);
+  pushToServer('liburConfig',cfg);
   showToast('✅ Setting weekend disimpan');
 }
 function isHariLibur(dateStr){
@@ -3648,6 +3686,7 @@ function saveLibur(){
   }
   cfg.libur.sort((a,b)=>a.tanggal.localeCompare(b.tanggal));
   DB.set('liburConfig',cfg);
+  pushToServer('liburConfig',cfg);
   document.getElementById('liburInputRow').style.display='none';
   inp.value='';
   _calSelectedDate=null;
@@ -3681,6 +3720,7 @@ function delLibur(id){
   const cfg=getLiburConfig();
   cfg.libur=(cfg.libur||[]).filter(x=>x.id!==id);
   DB.set('liburConfig',cfg);
+  pushToServer('liburConfig',cfg);
   renderCal();
   rLibur();
   showToast('🗑 Dihapus');
@@ -3750,7 +3790,7 @@ function saveGPS(){
   const lng=parseFloat(document.getElementById('gpsLng')?.value);
   const radius=parseInt(document.getElementById('gpsRadius')?.value)||100;
   if(!lat||!lng){showToast('⚠ Koordinat belum diisi');return;}
-  DB.set('gpsConfig',{lat,lng,radius});
+  const _gps={lat,lng,radius};DB.set('gpsConfig',_gps);pushToServer('gpsConfig',_gps);
   showToast('✅ Pengaturan GPS disimpan');
 }
 function loadGPSForm(){
@@ -4043,6 +4083,7 @@ function saveProjectLaporan(){
     approvalStatus:'PENDING'
   });
   DB.set('laporan',laps);
+  pushToServer('laporan',laps);
   closeModal('mProject');
   showToast('✅ Laporan Project tersimpan — menunggu approval');
   if(CU.role==='staff') rStaff(); else rSpv();
@@ -4084,6 +4125,7 @@ function saveGCLaporan(){
     approvalStatus:'PENDING'
   });
   DB.set('laporan',laps);
+  pushToServer('laporan',laps);
   closeModal('mProject');
   showToast(`✅ General Cleaning ${_gcAreas.length} area tersimpan — menunggu approval`);
   if(CU.role==='staff') rStaff(); else rSpv();
