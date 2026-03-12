@@ -3212,7 +3212,7 @@ function forceResetData(){
 // ── BUAT LAPORAN (Supervisor) ──
 let _lapBeforeData = null;
 
-async function openBuatLaporan(){
+function openBuatLaporan(){
   _lapBeforeData = null;
   // Reset form
   document.getElementById('lapBeforeImg').style.display='none';
@@ -3222,28 +3222,26 @@ async function openBuatLaporan(){
   document.getElementById('lapBeforeWarn').style.display='none';
   document.getElementById('lapCatatan').value='';
   document.getElementById('lapPrio').value='MEDIUM';
-  // Sync dari server dulu agar area & karyawan selalu fresh
-  if(SCRIPT_URL){ try{ await syncFromServer(); }catch(e){console.warn('sync err',e);} }
-  // Populate area dropdown
-  let areas = DB.get('area')||[];
-  // Jika masih kosong, coba ambil langsung dari server
-  if(!areas.length && SCRIPT_URL){
-    try{
-      const d = await apiCall({action:'getData', key:'area'});
-      if(d && Array.isArray(d.value)) { DB.set('area', d.value); areas = d.value; }
-      else if(d && Array.isArray(d)) { DB.set('area', d); areas = d; }
-    }catch(e){}
+  // Populate dari data lokal dulu — modal langsung buka
+  function _populateLapForm(areas, karyawan){
+    document.getElementById('lapArea').innerHTML = areas.length
+      ? areas.map(a=>{
+          const label = a.lantai ? `${a.nama} ${a.lantai}` : a.nama;
+          return `<option value="${label}">${label}</option>`;
+        }).join('')
+      : '<option value="">— Belum ada area, tambah di menu Area —</option>';
+    const staff = (karyawan||[]).filter(x=>['staff','internal'].includes(x.role)&&(x.aktif||x.status==='active'));
+    document.getElementById('lapStaff').innerHTML = '<option value="-">— Tugas Umum (siapa saja) —</option>' + staff.map(s=>`<option value="${s.nama}">${s.nama} (${s.role==='internal'?'Internal':'GS'})</option>`).join('');
   }
-  document.getElementById('lapArea').innerHTML = areas.length
-    ? areas.map(a=>{
-        const label = a.lantai ? `${a.nama} ${a.lantai}` : a.nama;
-        return `<option value="${label}">${label}</option>`;
-      }).join('')
-    : '<option value="">— Belum ada area, tambah di menu Area —</option>';
-  // Populate staff dropdown (General Service + Internal Service)
-  const staff = (DB.get('karyawan')||[]).filter(x=>['staff','internal'].includes(x.role)&&(x.aktif||x.status==='active'));
-  document.getElementById('lapStaff').innerHTML = '<option value="-">— Tugas Umum (siapa saja) —</option>' + staff.map(s=>`<option value="${s.nama}">${s.nama} (${s.role==='internal'?'Internal':'GS'})</option>`).join('');
+  // Buka modal LANGSUNG dengan data lokal
+  _populateLapForm(DB.get('area')||[], DB.get('karyawan')||[]);
   openModal('mLaporan');
+  // Sync server di background — update dropdown jika ada perubahan
+  if(SCRIPT_URL){
+    syncFromServer().then(()=>{
+      _populateLapForm(DB.get('area')||[], DB.get('karyawan')||[]);
+    }).catch(()=>{});
+  }
 }
 
 function triggerLapCam(){
@@ -3310,7 +3308,7 @@ function saveLaporan(){
 let _klaimFotoBefore = null; let _klaimFotoAfter = null;
 let _reviewKlaimId = null;
 
-async function openKlaimSpv(){
+function openKlaimSpv(){
   _klaimFotoBefore = null; _klaimFotoAfter = null;
   document.getElementById('klaimDesc').value='';
   document.getElementById('klaimDurasi').value='';
@@ -3318,15 +3316,19 @@ async function openKlaimSpv(){
   document.getElementById('klaimFotoBeforeEmpty').style.display='block';
   document.getElementById('klaimFotoAfterImg').style.display='none';
   document.getElementById('klaimFotoAfterEmpty').style.display='block';
-  // Sync area dari server dulu
-  if(SCRIPT_URL){ try{ await syncFromServer(); }catch(e){} }
-  const areas=DB.get('area')||[];
-  const sel=document.getElementById('klaimArea');
-  sel.innerHTML='<option value="">— Pilih Area —</option>'+areas.map(a=>{
-    const label = a.lantai ? `${a.nama} ${a.lantai}` : a.nama;
-    return `<option value="${label}">${label}</option>`;
-  }).join('');
+  function _fillKlaimArea(){
+    const areas=DB.get('area')||[];
+    const sel=document.getElementById('klaimArea');
+    sel.innerHTML='<option value="">— Pilih Area —</option>'+areas.map(a=>{
+      const label = a.lantai ? `${a.nama} ${a.lantai}` : a.nama;
+      return `<option value="${label}">${label}</option>`;
+    }).join('');
+  }
+  // Buka modal langsung dengan data lokal
+  _fillKlaimArea();
   openModal('mKlaim');
+  // Sync background
+  if(SCRIPT_URL){ syncFromServer().then(_fillKlaimArea).catch(()=>{}); }
 }
 
 function handleKlaimFoto(type, e){
