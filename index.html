@@ -364,7 +364,8 @@ table.dt tr:last-child td{border:none;}
 .mgr-filter-badge.f-breach{background:rgba(255,84,84,.12);color:var(--red);}
 @media(max-width:768px){
   .mgr-split{grid-template-columns:1fr;grid-template-rows:auto 1fr;}
-  .mgr-left{border-right:none;border-bottom:1px solid var(--line1);padding:10px 12px;gap:8px;}
+  .mgr-left{border-right:none;border-bottom:1px solid var(--line1);padding:10px 12px 100px;gap:8px;}
+  .mgr-tbl-wrap{padding-bottom:140px !important;}
 }
 /* PERIOD FILTER */
 .period-bar{display:flex;align-items:center;gap:8px;margin-bottom:16px;flex-wrap:wrap;}
@@ -2332,7 +2333,7 @@ function mkCard(l){
   const done=l.status==='SELESAI';
   const slotB=hB?`<div style="position:absolute;inset:0;background:var(--bg4);display:flex;align-items:center;justify-content:center;font-size:30px;">${l.fotoBefore||'📷'}</div>`:`<div class="pe"><div class="pei">📷</div><p class="pet">Foto Sebelum</p><p class="pes">Tap untuk ambil</p></div>`;
   const slotA=hA?`<div style="position:absolute;inset:0;background:var(--bg4);display:flex;align-items:center;justify-content:center;font-size:30px;">${l.fotoAfter||'✨'}</div>`:`<div class="pe"><div class="pei">📷</div><p class="pet">Foto Sesudah</p><p class="pes">Setelah selesai</p></div>`;
-  const body=done?`<div class="pgrid"><div class="pslot fi" style="cursor:default">${slotB}<span class="ptag ptb">Sebelum ✓</span></div><div class="pslot fi" style="cursor:default">${slotA}<span class="ptag pta">Sesudah ✓</span></div></div><div style="padding:10px 12px;background:var(--green-f);border-radius:var(--r-sm);border:1px solid rgba(48,217,122,.18);font-size:15px;color:var(--green);font-weight:600;text-align:center;">✓ Laporan terkirim · Diverifikasi ${l.supervisor}</div>`:`<div class="pgrid"><div class="pslot${hB?' fi':''}" onclick="openCam(${l.id},'before');event.stopPropagation()">${slotB}<span class="ptag ptb">Sebelum${hB?' ✓':''}</span></div><div class="pslot${hA?' fi':''}" onclick="openCam(${l.id},'after');event.stopPropagation()">${slotA}<span class="ptag pta">Sesudah${hA?' ✓':''}</span></div></div><button class="ab ab-b" onclick="openCam(${l.id},'before');event.stopPropagation()">📷 ${hB?'Ulangi':'Ambil'} Foto Sebelum</button><button class="ab ab-a"${!hB?' disabled':''} onclick="openCam(${l.id},'after');event.stopPropagation()">✓ Ambil Foto Sesudah</button><button class="ab ab-s"${!(hB&&hA)?' disabled':''} onclick="submitTask(${l.id});event.stopPropagation()">Selesaikan &amp; Kirim Laporan</button>`;
+  const body=done?`<div class="pgrid"><div class="pslot fi" style="cursor:default">${slotB}<span class="ptag ptb">Sebelum ✓</span></div><div class="pslot fi" style="cursor:default">${slotA}<span class="ptag pta">Sesudah ✓</span></div></div><div style="padding:10px 12px;background:var(--green-f);border-radius:var(--r-sm);border:1px solid rgba(48,217,122,.18);font-size:15px;color:var(--green);font-weight:600;text-align:center;">✓ Laporan terkirim · Diverifikasi ${l.supervisor}</div>`:`<div class="pgrid"><div class="pslot${hB?' fi':''}" onclick="${hB?'openPhotoView('+l.id+',\'before\')':'openCam('+l.id+',\'before\')'};event.stopPropagation()">${slotB}<span class="ptag ptb">Sebelum${hB?' ✓':''}</span></div><div class="pslot${hA?' fi':''}" onclick="${hA?'openPhotoView('+l.id+',\'after\')':'openCam('+l.id+',\'after\')'};event.stopPropagation()">${slotA}<span class="ptag pta">Sesudah${hA?' ✓':''}</span></div></div><button class="ab ab-b" onclick="openCam(${l.id},'before');event.stopPropagation()">📷 ${hB?'Ulangi':'Ambil'} Foto Sebelum</button><button class="ab ab-a"${!hB?' disabled':''} onclick="openCam(${l.id},'after');event.stopPropagation()">✓ Ambil Foto Sesudah</button><button class="ab ab-s"${!(hB&&hA)?' disabled':''} onclick="submitTask(${l.id});event.stopPropagation()">Selesaikan &amp; Kirim Laporan</button>`;
   return `<div class="tc" onclick="toggleCard(this)"><div class="tcp"><div class="ps ${pm[l.prioritas]||'ps-m'}"></div><div class="tr1"><div><div class="tan">${l.area}</div><div class="tca">${l.kategori}</div></div><span class="pill ${sp}">${l.status}</span></div><div class="tmeta"><span>📍 ${l.area}</span><span class="pill ${sc}" style="padding:2px 8px;font-size:13px">${l.sla==='BREACH'?'BREACH':l.durasi+'mnt'}</span>${l.supervisor?`<span>👔 ${l.supervisor}</span>`:''}</div></div><div class="tb" id="tb-${l.id}">${body}</div></div>`;
 }
 let _spvKPI={pending:true,verified:false,breach:false};
@@ -2544,6 +2545,25 @@ function mkAssignCard(l){
       ${staffItems||'<div style="padding:16px;text-align:center;color:var(--t3);font-size:14px;">Tidak ada staff aktif</div>'}
     </div>
   </div></div></div>`;
+}
+function openPhotoView(lid, type){
+  // Lightbox untuk lihat foto before/after dari card tugas
+  const l=(DB.get('laporan')||[]).find(x=>x.id===lid);
+  const src = type==='before'
+    ? (camStore[lid]?.before || l?.fotoBefore || null)
+    : (camStore[lid]?.after  || l?.fotoAfter  || null);
+  if(!src){ showToast('Foto belum tersedia'); return; }
+  const box=document.getElementById('lightbox');
+  const content=document.getElementById('lbContent');
+  const label=document.getElementById('lbLabel');
+  if(!box||!content) return;
+  if(src.startsWith('data:')||src.startsWith('http')){
+    content.innerHTML=`<img src="${src}" style="max-width:100%;max-height:80vh;border-radius:8px;object-fit:contain;">`;
+  } else {
+    content.innerHTML=`<div style="font-size:80px;text-align:center;">${src}</div>`;
+  }
+  if(label) label.textContent = type==='before' ? 'Foto Before' : 'Foto After';
+  box.classList.add('open');
 }
 function openSpvThumb(lid){
   // Tampilkan foto before di lightbox (zoom view)
