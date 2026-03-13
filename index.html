@@ -124,6 +124,7 @@ table.dt tr:last-child td{border:none;}
 .kpi.kg::before{background:var(--green);}.kpi.kb::before{background:var(--blue);}
 .kpi.ko::before{background:var(--orange);}.kpi.kr::before{background:var(--red);}
 .kpi.active-filter{box-shadow:0 0 0 2px currentColor;transform:translateY(-2px);}
+.active-row{background:var(--bg3) !important;border-left:3px solid var(--blue);}
 .kpi.kg.active-filter{box-shadow:0 0 0 2px var(--green);background:rgba(48,217,122,.08);}
 .kpi.kb.active-filter{box-shadow:0 0 0 2px var(--blue);background:rgba(59,158,255,.08);}
 .kpi.ko.active-filter{box-shadow:0 0 0 2px var(--orange);background:rgba(255,170,59,.08);}
@@ -584,7 +585,7 @@ table.dt tr:last-child td{border:none;}
                 <table class="dt" style="min-width:680px">
                   <thead><tr>
                     <th>Area</th><th>Kategori</th><th>Prioritas</th><th>Staff</th>
-                    <th>Tanggal</th><th>SLA</th><th>Status</th><th>Aksi</th>
+                    <th>Tanggal</th><th>Durasi</th><th>SLA</th><th>Status</th><th>Aksi</th>
                   </tr></thead>
                   <tbody id="tbLap"></tbody>
                 </table>
@@ -1476,7 +1477,20 @@ table.dt tr:last-child td{border:none;}
           const fotoAfter  = (srv.fotoAfter==='[foto]' ||!srv.fotoAfter)  ? (loc.fotoAfter ||srv.fotoAfter)  : srv.fotoAfter;
           // Pertahankan durasi lokal jika server punya 0 atau kosong
           const durasi = (srv.durasi==='0'||srv.durasi===0||!srv.durasi) ? (loc.durasi||srv.durasi) : srv.durasi;
-          return {...srv, fotoBefore, fotoAfter, durasi};
+          // ── CRITICAL: pertahankan field penting dari lokal jika server kosong ──
+          // Ini terjadi kalau data di Sheets korup (foto base64 dulu bikin setValue gagal)
+          const area      = srv.area      || loc.area      || '';
+          const kategori  = srv.kategori  || loc.kategori  || '';
+          const prioritas = srv.prioritas || loc.prioritas || '';
+          const staff     = srv.staff     || loc.staff     || '';
+          const supervisor= srv.supervisor|| loc.supervisor|| '';
+          const created   = srv.created   || loc.created   || loc.createdAt || '';
+          const tanggal   = srv.tanggal   || loc.tanggal   || '';
+          const upload    = srv.upload    || loc.upload    || '';
+          const catatan   = srv.catatan   !== undefined ? srv.catatan : (loc.catatan||'');
+          return {...srv, area, kategori, prioritas, staff, supervisor,
+                  created, tanggal, upload, catatan,
+                  fotoBefore, fotoAfter, durasi};
         });
         // Tambah laporan lokal yang belum ada di server
         const serverIds = new Set(d.laporan.map(x=>x.id));
@@ -1895,17 +1909,43 @@ function rLap(){
   const pColor={urgent:'var(--red)',high:'var(--orange)',medium:'var(--yellow)',low:'var(--green)'};
   const sColor={SELESAI:'done','IN PROGRESS':'prog',BREACH:'breach',PENDING:'open'};
   
-  document.getElementById('tbLap').innerHTML=l.length?l.map(x=>`<tr>
-    <td><div class="tdp">${x.area||'—'}</div></td>
-    <td><div class="tds">${x.kategori||'—'}</div></td>
-    <td><span style="color:${pColor[(x.prioritas||'').toLowerCase()]||'var(--t2)'};font-weight:600;text-transform:capitalize;">${x.prioritas||'—'}</span></td>
-    <td>${x.staffNama||x.staff||'—'}</td>
-    <td style="font-size:14px;color:var(--t3);">${(x.tanggal||x.createdAt||'').slice(0,10)||'—'}</td>
-    <td><span class="pill p-${x.sla==='OK'?'ok':x.sla==='WARN'?'warn':'breach'}">${x.sla||'—'}</span></td>
-    <td><span class="pill p-${sColor[x.status]||'open'}">${fmtStatus(x.status)}</span></td>
-    <td><button class="btn btn-sm btn-red" onclick="delLap(${x.id})">Hapus</button></td>
-  </tr>`).join('')
-  :'<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--t3);">Tidak ada data yang cocok</td></tr>';
+  const _isImg2=s=>s&&(s.startsWith('data:')||s.startsWith('http'));
+  document.getElementById('tbLap').innerHTML=l.length?l.map(x=>{
+    const _c=x.created||x.createdAt||x.tanggal||null;
+    const _live=_c?Math.round((Date.now()-new Date(_c).getTime())/60000):0;
+    const dur=x.status==='SELESAI'?(parseInt(x.durasi)||_live):_live;
+    const ds=dur>=60?Math.floor(dur/60)+'j '+(dur%60)+'m':dur+'m';
+    const tgl=(_c||'').slice(0,10)||'—';
+    const hasFB=_isImg2(x.fotoBefore), hasFAfter=_isImg2(x.fotoAfter);
+    const fBThumb=hasFB?`<img src="${x.fotoBefore}" onclick="openLightboxUrl('${x.fotoBefore}','Foto Sebelum');event.stopPropagation()" style="width:48px;height:48px;object-fit:cover;border-radius:6px;cursor:zoom-in;border:1.5px solid var(--line1);">`:`<span style="font-size:22px;opacity:.4;">📷</span>`;
+    const fAThumb=hasFAfter?`<img src="${x.fotoAfter}" onclick="openLightboxUrl('${x.fotoAfter}','Foto Sesudah');event.stopPropagation()" style="width:48px;height:48px;object-fit:cover;border-radius:6px;cursor:zoom-in;border:1.5px solid var(--line1);">`:`<span style="font-size:22px;opacity:.4;">✨</span>`;
+    const detail=`<tr id="lapdet-${x.id}" style="display:none;"><td colspan="9" style="padding:0;"><div style="padding:12px 16px;background:var(--bg3);border-bottom:1px solid var(--line1);">
+      <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start;">
+        <div style="display:flex;gap:10px;">${fBThumb}${fAThumb}</div>
+        <div style="flex:1;min-width:200px;font-size:14px;line-height:1.8;color:var(--t2);">
+          <div><b>ID:</b> ${x.id}</div>
+          <div><b>Supervisor:</b> ${x.supervisor||'—'}</div>
+          <div><b>Catatan:</b> ${x.catatan||'—'}</div>
+          <div><b>Upload:</b> ${x.upload||'—'} · <b>Selesai:</b> ${x.selesai||'—'}</div>
+          ${x.isBreach?`<div style="color:var(--red);font-weight:600;">⚠ Breach: ${x.breachReason||''}</div>`:''}
+        </div>
+        <button class="btn btn-sm btn-red" onclick="delLap(${x.id});event.stopPropagation()">Hapus</button>
+      </div>
+    </div></td></tr>`;
+    const row=`<tr style="cursor:pointer;" onclick="toggleLapDetail(${x.id})">
+      <td><div class="tdp">${x.area||'—'}</div></td>
+      <td><div class="tds">${x.kategori||'—'}</div></td>
+      <td><span style="color:${pColor[(x.prioritas||'').toLowerCase()]||'var(--t2)'};font-weight:600;text-transform:capitalize;">${x.prioritas||'—'}</span></td>
+      <td>${x.staff||'—'}</td>
+      <td style="font-size:14px;color:var(--t3);">${tgl}</td>
+      <td style="font-weight:600;">${ds}</td>
+      <td><span class="pill p-${x.sla==='OK'?'ok':x.sla==='WARN'?'warn':'breach'}">${x.sla||'—'}</span></td>
+      <td><span class="pill p-${sColor[x.status]||'open'}">${fmtStatus(x.status)}</span></td>
+      <td><span style="font-size:12px;color:var(--t3);">▼ detail</span></td>
+    </tr>`;
+    return row+detail;
+  }).join('')
+  :'<tr><td colspan="9" style="text-align:center;padding:24px;color:var(--t3);">Tidak ada data yang cocok</td></tr>';
 }
 function resetLapFilter(){
   ['lapSearch','lapFStatus','lapFPeriod','lapFPrio'].forEach(id=>{
@@ -2126,6 +2166,8 @@ function drawDonut(data) {
 }
 
 function rManager(){
+  // Cek breach dulu sebelum render KPI
+  autoBreachCheck();
   const _all=DB.get('laporan')||[];
   _all.forEach(x=>{x.sla=calcSLAStatus(x);});
   const l=filterByPeriod(_all);
@@ -2425,6 +2467,38 @@ function ambilTugas(id){
   showToast('✋ Tugas diambil! Silakan kerjakan.');
   setTimeout(()=>rStaff(),300);
 }
+function toggleLapDetail(id){
+  const det=document.getElementById('lapdet-'+id);
+  if(!det) return;
+  const open=det.style.display!=='none';
+  // tutup semua detail lain dulu
+  document.querySelectorAll('[id^="lapdet-"]').forEach(el=>el.style.display='none');
+  document.querySelectorAll('#tbLap tr[style*="cursor:pointer"]').forEach(r=>r.classList.remove('active-row'));
+  if(!open){
+    det.style.display='';
+    // highlight row yg aktif
+    const prev=det.previousElementSibling;
+    if(prev) prev.classList.add('active-row');
+  }
+}
+
+function openLightboxUrl(src, title){
+  if(!src) return;
+  const lb=document.getElementById('lightbox');
+  if(!lb){
+    const el=document.createElement('div');
+    el.id='lightbox';
+    el.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:1200;display:flex;flex-direction:column;align-items:center;justify-content:center;';
+    el.innerHTML=`<div style="color:#fff;font-size:14px;margin-bottom:10px;opacity:.7;">${title||''}</div><img id="lbImg" style="max-width:92vw;max-height:80vh;border-radius:10px;object-fit:contain;"><div style="margin-top:14px;"><button onclick="document.getElementById('lightbox').remove()" style="background:rgba(255,255,255,.15);color:#fff;border:none;border-radius:20px;padding:8px 24px;font-size:15px;cursor:pointer;">✕ Tutup</button></div>`;
+    el.onclick=e=>{if(e.target===el)el.remove();};
+    document.body.appendChild(el);
+  }
+  const lbEl=document.getElementById('lightbox');
+  lbEl.querySelector('div').textContent=title||'';
+  lbEl.style.display='flex';
+  document.getElementById('lbImg').src=src;
+}
+
 function toggleCard(card){const b=card.querySelector('.tb'),op=b.classList.contains('open');document.querySelectorAll('.tb').forEach(x=>x.classList.remove('open'));if(!op)b.classList.add('open');}
 function submitTask(id){
   const l=DB.get('laporan')||[],i=l.findIndex(x=>x.id===id);
@@ -2888,10 +2962,25 @@ function rMgrAnalitik(){
   const laps=DB.get('laporan')||[];
   const total=laps.length;
   const selesai=laps.filter(x=>x.status==='SELESAI').length;
-  const breach=laps.filter(x=>x.status==='BREACH'||x.isBreach).length;
+  // Hitung breach: status BREACH atau elapsed > SLA target
+  const cfg2=getSLA(),tgt2={URGENT:cfg2.urgent,HIGH:cfg2.high,MEDIUM:cfg2.medium,LOW:cfg2.low};
+  const breach=laps.filter(x=>{
+    if(x.status==='BREACH'||x.isBreach) return true;
+    if(x.status==='SELESAI') return false;
+    const _c=x.created||x.createdAt||x.tanggal;
+    const _e=_c?Math.round((Date.now()-new Date(_c).getTime())/60000):0;
+    return _e>=(tgt2[(x.prioritas||'').toUpperCase()]||60);
+  }).length;
   const inProg=laps.filter(x=>x.status==='IN PROGRESS').length;
   const rate=total?Math.round(selesai/total*100):0;
   window._aLaps=laps;
+  // Set active-filter ke Total saat render awal
+  ['aKpiTotal','aKpiSelesai','aKpiProg','aKpiBreach'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.closest('.kpi')?.classList.remove('active-filter');
+  });
+  const _aInit=document.getElementById('aKpiTotal');
+  if(_aInit) _aInit.closest('.kpi')?.classList.add('active-filter');
   // KPI values
   document.getElementById('aKpiTotal').textContent=total;
   document.getElementById('aKpiSelesai').textContent=selesai;
@@ -2912,7 +3001,7 @@ function rMgrAnalitik(){
   // Tren 7 hari
   const trenEl=document.getElementById('analitikTren');
   if(trenEl){
-    const days=[];for(let i=6;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);const ds=d.toLocaleDateString('id-ID',{weekday:'short'});const dateStr=d.toISOString().slice(0,10);const cnt=laps.filter(x=>(x.tanggal||x.createdAt||'').startsWith(dateStr)).length;days.push({label:ds,cnt});}
+    const days=[];for(let i=6;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);const ds=d.toLocaleDateString('id-ID',{weekday:'short'});const dateStr=d.toISOString().slice(0,10);const cnt=laps.filter(x=>(x.created||x.createdAt||x.tanggal||'').slice(0,10)===dateStr).length;days.push({label:ds,cnt});}
     const maxCnt=Math.max(1,...days.map(d=>d.cnt));
     trenEl.innerHTML=days.map(d=>`<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;"><div style="font-size:12px;font-weight:700;color:var(--t2);">${d.cnt||''}</div><div style="width:100%;background:var(--blue);border-radius:3px 3px 0 0;height:${Math.max(4,d.cnt/maxCnt*70)}px;min-height:4px;"></div><div style="font-size:11px;color:var(--t3);white-space:nowrap;">${d.label}</div></div>`).join('');
   }
@@ -2928,14 +3017,42 @@ function aKpiClick(filter){
   if(badge){badge.className='mgr-filter-badge '+(classes[filter]||'f-all');}
   if(txt)txt.textContent=labels[filter]||filter;
   if(x)x.style.display=filter==='all'?'none':'inline';
+  // Active-filter highlight di KPI card
+  const aKpiMap={'all':'aKpiTotal','SELESAI':'aKpiSelesai','IN PROGRESS':'aKpiProg','BREACH':'aKpiBreach'};
+  ['aKpiTotal','aKpiSelesai','aKpiProg','aKpiBreach'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.closest('.kpi')?.classList.remove('active-filter');
+  });
+  const activeId=aKpiMap[filter];
+  if(activeId){const el=document.getElementById(activeId);if(el)el.closest('.kpi')?.classList.add('active-filter');}
   const filtered=filter==='all'?laps:laps.filter(x=>x.status===filter||(filter==='BREACH'&&x.isBreach));
   rTblAnalitik(filtered);
 }
 function rTblAnalitik(laps){
   const tb=document.getElementById('tbAnalitik');if(!tb)return;
   if(!laps.length){tb.innerHTML='<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--t3);">Tidak ada data</td></tr>';return;}
-  const sc={SELESAI:'var(--green)','IN PROGRESS':'var(--blue)',BREACH:'var(--red)',PENDING:'var(--orange)'};
-  tb.innerHTML=laps.map(x=>{const dur=x.completedAt&&x.assignedAt?Math.round((new Date(x.completedAt)-new Date(x.assignedAt))/60000)+' mnt':'—';return `<tr><td>${x.area||'—'}</td><td>${x.kategori||'—'}</td><td>${x.prioritas||'—'}</td><td>${x.staffNama||x.staff||'—'}</td><td>${dur}</td><td><span style="color:${sc[x.status]||'var(--t2)'};font-weight:600;">${fmtStatus(x.status)}</span></td><td style="font-size:14px;">${(x.tanggal||x.createdAt||'').slice(0,10)||'—'}</td></tr>`;}).join('');
+  const sc={SELESAI:'var(--green)','IN PROGRESS':'var(--blue)',BREACH:'var(--red)',OPEN:'var(--orange)',PENDING:'var(--orange)'};
+  const cfg=getSLA(),tgt={URGENT:cfg.urgent,HIGH:cfg.high,MEDIUM:cfg.medium,LOW:cfg.low};
+  tb.innerHTML=laps.map(x=>{
+    // Durasi: pakai x.durasi kalau SELESAI, atau hitung live dari created
+    const _c=x.created||x.createdAt||x.tanggal||null;
+    const _liveDur=_c?Math.round((Date.now()-new Date(_c).getTime())/60000):0;
+    const dur=x.status==='SELESAI'?(parseInt(x.durasi)||_liveDur):_liveDur;
+    const _target=tgt[(x.prioritas||'').toUpperCase()]||60;
+    const slaOk=dur<=_target;
+    const durStr=dur>=60?Math.floor(dur/60)+'j '+(dur%60)+'m':dur+'m';
+    const durColor=x.status==='SELESAI'?(slaOk?'var(--green)':'var(--red)'):'var(--t2)';
+    const tgl=(_c||'').slice(0,10)||'—';
+    return `<tr>
+      <td>${x.area||'—'}</td>
+      <td>${x.kategori||'—'}</td>
+      <td>${x.prioritas||'—'}</td>
+      <td>${x.staff||'—'}</td>
+      <td style="color:${durColor};font-weight:700;">${durStr}</td>
+      <td><span style="color:${sc[x.status]||'var(--t2)'};font-weight:600;">${fmtStatus(x.status)}</span></td>
+      <td style="font-size:14px;">${tgl}</td>
+    </tr>`;
+  }).join('');
 }
 
 // ══════════════════════════════════════════════
@@ -3031,14 +3148,31 @@ function pKpiClick(filter){
 //  SLA BREACH LIST
 // ══════════════════════════════════════════════
 function rMgrBreach(){
+  // Paksa cek & update status breach dulu sebelum render
+  autoBreachCheck();
   const laps=DB.get('laporan')||[];
-  const allBreaches=laps.filter(x=>x.status==='BREACH'||x.isBreach);
+  // Include: status BREACH, isBreach=true, ATAU elapsed sudah lewat SLA target
+  const cfg=getSLA(),tgt={URGENT:cfg.urgent,HIGH:cfg.high,MEDIUM:cfg.medium,LOW:cfg.low};
+  const allBreaches=laps.filter(x=>{
+    if(x.status==='BREACH'||x.isBreach) return true;
+    if(x.status==='SELESAI') return false;
+    const _c=x.created||x.createdAt||x.tanggal;
+    const _e=_c?Math.round((Date.now()-new Date(_c).getTime())/60000):0;
+    return _e>=(tgt[(x.prioritas||'').toUpperCase()]||60);
+  });
   const total=laps.length;
   const br=allBreaches.length;
   const open=allBreaches.filter(x=>x.status!=='SELESAI').length;
   const done=allBreaches.filter(x=>x.status==='SELESAI').length;
   const pct=total?Math.round(br/total*100):0;
   window._bLaps=allBreaches;
+  // Set active-filter ke Total saat render awal
+  ['bKpiTotal','bKpiOpen','bKpiDone','bKpiRate'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.closest('.kpi')?.classList.remove('active-filter');
+  });
+  const _bInit=document.getElementById('bKpiTotal');
+  if(_bInit) _bInit.closest('.kpi')?.classList.add('active-filter');
   document.getElementById('bKpiTotal').textContent=br;
   document.getElementById('bKpiOpen').textContent=open;
   document.getElementById('bKpiDone').textContent=done;
@@ -3073,10 +3207,29 @@ function bKpiClick(filter){
   if(badge) badge.className='mgr-filter-badge '+(classes[filter]||'f-breach');
   if(txt) txt.textContent=labels[filter]||filter;
   if(x) x.style.display=filter==='all'?'none':'inline';
+  // Active-filter highlight di KPI card
+  const bKpiMap={'all':'bKpiTotal','open':'bKpiOpen','done':'bKpiDone'};
+  ['bKpiTotal','bKpiOpen','bKpiDone','bKpiRate'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.closest('.kpi')?.classList.remove('active-filter');
+  });
+  const activeId=bKpiMap[filter];
+  if(activeId){const el=document.getElementById(activeId);if(el)el.closest('.kpi')?.classList.add('active-filter');}
   const tb=document.getElementById('tbBreach');if(!tb)return;
   if(!list.length){tb.innerHTML='<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--t3);">✅ Tidak ada SLA Breach</td></tr>';return;}
   const pc={urgent:'var(--red)',high:'var(--orange)',medium:'var(--yellow)',low:'var(--green)'};
-  tb.innerHTML=list.map(x=>{const p=(x.prioritas||'').toLowerCase();const dur=(x.duration||x.durasi||0);const ds=dur>=60?Math.floor(dur/60)+'j '+(dur%60)+'m':dur+'m';const sc=x.status==='SELESAI'?'var(--green)':'var(--red)';return `<tr><td style="font-weight:600;">${x.area||'-'}</td><td>${x.kategori||'-'}</td><td><span style="color:${pc[p]||'var(--t2)'};font-weight:700;text-transform:capitalize;">${p||'-'}</span></td><td>${x.staffNama||x.staff||'-'}</td><td style="color:var(--red);font-weight:700;">${ds}</td><td><span style="color:${sc};font-weight:600;">${fmtStatus(x.status)}</span></td><td style="color:var(--t3);font-size:14px;">${(x.tanggal||x.createdAt||'').slice(0,10)||'-'}</td></tr>`;}).join('');
+  const cfg=getSLA(),tgt={URGENT:cfg.urgent,HIGH:cfg.high,MEDIUM:cfg.medium,LOW:cfg.low};
+  tb.innerHTML=list.map(x=>{
+    const p=(x.prioritas||'').toLowerCase();
+    // Durasi live dari created, bukan x.durasi yg bisa 0
+    const _c=x.created||x.createdAt||x.tanggal||null;
+    const _live=_c?Math.round((Date.now()-new Date(_c).getTime())/60000):0;
+    const dur=x.status==='SELESAI'?(parseInt(x.durasi)||_live):_live;
+    const ds=dur>=60?Math.floor(dur/60)+'j '+(dur%60)+'m':dur+'m';
+    const sc=x.status==='SELESAI'?'var(--green)':'var(--red)';
+    const tgl=(_c||'').slice(0,10)||'-';
+    return `<tr><td style="font-weight:600;">${x.area||'-'}</td><td>${x.kategori||'-'}</td><td><span style="color:${pc[p]||'var(--t2)'};font-weight:700;text-transform:capitalize;">${p||'-'}</span></td><td>${x.staff||'-'}</td><td style="color:var(--red);font-weight:700;">${ds}</td><td><span style="color:${sc};font-weight:600;">${fmtStatus(x.status)}</span></td><td style="color:var(--t3);font-size:14px;">${tgl}</td></tr>`;
+  }).join('');
 }
 // ══════════════════════════════════════════════
 //  REKAP BULANAN
@@ -3254,17 +3407,33 @@ function compressImage(dataUrl, maxPx, quality, cb){
   };
   img.src=dataUrl;
 }
+
+async function uploadFotoToDrive(base64Data, fileName){
+  // Upload foto ke Google Drive via Apps Script, return URL publik
+  if(!base64Data || !base64Data.startsWith('data:')) return base64Data;
+  try {
+    const res = await apiCall({action:'uploadFoto', data:base64Data, fileName:fileName});
+    if(res && res.url) return res.url;
+  } catch(e) {}
+  // Fallback: simpan base64 lokal kalau Drive gagal
+  return base64Data;
+}
 function handleFile(e){
   const f=e.target.files[0];if(!f)return;
   const r=new FileReader();
   r.onload=ev=>{
-    compressImage(ev.target.result, 1024, 0.7, function(compressed){
+    compressImage(ev.target.result, 1024, 0.7, async function(compressed){
+      // Tampilkan preview dulu (pakai base64 lokal)
       document.getElementById('cImg').src=compressed;
       document.getElementById('cPrev').style.display='block';
       document.getElementById('cOpen').style.display='none';
       document.getElementById('cConf').style.display='flex';
       camStore[camTask]=camStore[camTask]||{};
-      camStore[camTask][camType]=compressed;
+      camStore[camTask][camType]=compressed; // sementara base64
+      // Upload ke Drive di background
+      const fname='click_'+camTask+'_'+camType+'_'+Date.now()+'.jpg';
+      const driveUrl = await uploadFotoToDrive(compressed, fname);
+      camStore[camTask][camType]=driveUrl; // ganti dengan Drive URL
     });
   };
   r.readAsDataURL(f);e.target.value='';
@@ -3368,14 +3537,19 @@ function handleLapFile(e){
   const f=e.target.files[0]; if(!f) return;
   const r=new FileReader();
   r.onload=ev=>{
-    compressImage(ev.target.result, 1024, 0.7, function(compressed){
-      _lapBeforeData = compressed;
+    compressImage(ev.target.result, 1024, 0.7, async function(compressed){
+      _lapBeforeData = compressed; // sementara base64
       const img=document.getElementById('lapBeforeImg');
-      img.src=_lapBeforeData; img.style.display='block';
+      img.src=compressed; img.style.display='block';
       document.getElementById('lapBeforeEmpty').style.display='none';
       document.getElementById('lapBeforeTaken').style.display='block';
       document.getElementById('lapBeforePreview').style.borderColor='var(--green)';
       document.getElementById('lapBeforeWarn').style.display='none';
+      // Upload ke Drive di background
+      const fname='click_lap_before_'+Date.now()+'.jpg';
+      const driveUrl = await uploadFotoToDrive(compressed, fname);
+      _lapBeforeData = driveUrl; // ganti dengan Drive URL
+      if(img) img.src=driveUrl; // update preview dengan Drive URL
     });
   };
   r.readAsDataURL(f); e.target.value='';
