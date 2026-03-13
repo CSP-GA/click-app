@@ -1475,12 +1475,21 @@ table.dt tr:last-child td{border:none;}
         const localLap = JSON.parse(localStorage.getItem('click_laporan')||'[]');
         const localMap = {};
         localLap.forEach(x => { localMap[x.id] = x; });
-        const merged = d.laporan.map(srv => {
+        // Filter: buang data yang bukan laporan (karyawan nyasar)
+        const cleanServer = d.laporan.filter(x =>
+          x.kategori !== undefined && x.kategori !== '' ||
+          x.created || x.upload || x.status === 'OPEN' ||
+          x.status === 'IN PROGRESS' || x.status === 'SELESAI' ||
+          x.status === 'BREACH'
+        );
+        const merged = cleanServer.map(srv => {
           const loc = localMap[srv.id];
           if (!loc) return srv;
           // Pertahankan foto lokal jika server hanya punya placeholder
-          const fotoBefore = (srv.fotoBefore==='[foto]'||!srv.fotoBefore) ? (loc.fotoBefore||srv.fotoBefore) : srv.fotoBefore;
-          const fotoAfter  = (srv.fotoAfter==='[foto]' ||!srv.fotoAfter)  ? (loc.fotoAfter ||srv.fotoAfter)  : srv.fotoAfter;
+          const _fb = (srv.fotoBefore==='[foto]'||!srv.fotoBefore) ? (loc.fotoBefore||srv.fotoBefore) : srv.fotoBefore;
+          const _fa = (srv.fotoAfter==='[foto]' ||!srv.fotoAfter)  ? (loc.fotoAfter ||srv.fotoAfter)  : srv.fotoAfter;
+          const fotoBefore = normalizeDriveUrl(_fb);
+          const fotoAfter  = normalizeDriveUrl(_fa);
           // Pertahankan durasi lokal jika server punya 0 atau kosong
           const durasi = (srv.durasi==='0'||srv.durasi===0||!srv.durasi) ? (loc.durasi||srv.durasi) : srv.durasi;
           // ── CRITICAL: pertahankan field penting dari lokal jika server kosong ──
@@ -1521,10 +1530,17 @@ table.dt tr:last-child td{border:none;}
     async function pushToServer(key, value) {
       if (!SCRIPT_URL) return;
       try {
-        await apiCall({action:'setData', key, value});
+        let val = value;
+        // Strip base64 foto sebelum kirim - foto base64 bikin payload oversize → Apps Script timeout
+        if(key === 'laporan' && Array.isArray(val)){
+          val = val.map(x => ({...x,
+            fotoBefore: (x.fotoBefore && x.fotoBefore.startsWith('data:')) ? '[foto]' : (x.fotoBefore||null),
+            fotoAfter:  (x.fotoAfter  && x.fotoAfter.startsWith('data:'))  ? '[foto]' : (x.fotoAfter||null)
+          }));
+        }
+        await apiCall({action:'setData', key, value:val});
       } catch(e) {
-        // Retry 1x setelah 3 detik jika gagal
-        setTimeout(()=>apiCall({action:'setData', key, value}).catch(()=>{}), 3000);
+        setTimeout(()=>pushToServer(key, value), 3000);
       }
     }
     // ── Registrasi user baru ke server ──
@@ -2407,7 +2423,7 @@ function mkCard(l){
   const done=l.status==='SELESAI';
   const _fB=camStore[l.id]?.before||l.fotoBefore||null;
   const _fA=camStore[l.id]?.after||l.fotoAfter||null;
-  const _isImg=src=>src&&(src.startsWith('data:')||src.startsWith('http'));
+  const _isImg=src=>src&&(src.startsWith('data:')||src.startsWith('http'))&&src!=='[foto]';
   const slotB=hB?(_isImg(_fB)?`<img src="${_fB}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">`:`<div style="position:absolute;inset:0;background:var(--bg4);display:flex;align-items:center;justify-content:center;font-size:30px;">${_fB||'📷'}</div>`):`<div class="pe"><div class="pei">📷</div><p class="pet">Foto Sebelum</p><p class="pes">Tap untuk ambil</p></div>`;
   const slotA=hA?(_isImg(_fA)?`<img src="${_fA}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">`:`<div style="position:absolute;inset:0;background:var(--bg4);display:flex;align-items:center;justify-content:center;font-size:30px;">${_fA||'✨'}</div>`):`<div class="pe"><div class="pei">📷</div><p class="pet">Foto Sesudah</p><p class="pes">Setelah selesai</p></div>`;
   const body=done?`<div class="pgrid"><div class="pslot fi" style="cursor:default">${slotB}<span class="ptag ptb">Sebelum ✓</span></div><div class="pslot fi" style="cursor:default">${slotA}<span class="ptag pta">Sesudah ✓</span></div></div><div style="padding:10px 12px;background:var(--green-f);border-radius:var(--r-sm);border:1px solid rgba(48,217,122,.18);font-size:15px;color:var(--green);font-weight:600;text-align:center;">✓ Laporan terkirim · Diverifikasi ${l.supervisor}</div>`:`<div class="pgrid"><div class="pslot${hB?' fi':''}" onclick="${hB?'openPhotoView('+l.id+',\'before\')':'openCam('+l.id+',\'before\')'};event.stopPropagation()">${slotB}<span class="ptag ptb">Sebelum${hB?' ✓':''}</span></div><div class="pslot${hA?' fi':''}" onclick="${hA?'openPhotoView('+l.id+',\'after\')':'openCam('+l.id+',\'after\')'};event.stopPropagation()">${slotA}<span class="ptag pta">Sesudah${hA?' ✓':''}</span></div></div><button class="ab ab-b" onclick="openCam(${l.id},'before');event.stopPropagation()">📷 ${hB?'Ulangi':'Ambil'} Foto Sebelum</button><button class="ab ab-a"${!hB?' disabled':''} onclick="openCam(${l.id},'after');event.stopPropagation()">✓ Ambil Foto Sesudah</button><button class="ab ab-s"${!(hB&&hA)?' disabled':''} onclick="submitTask(${l.id});event.stopPropagation()">Selesaikan &amp; Kirim Laporan</button>`;
@@ -2782,7 +2798,7 @@ function mkVCard(l){
   var rat=l.rating||0,stars='';
   for(var n=1;n<=5;n++){stars+='<button class="star" onclick="setRating('+l.id+','+n+')" style="color:'+(rat>=n?'var(--yellow)':'var(--t4)')+';color:'+(rat>=n?'var(--yellow)':'var(--t4)')+';">'+(rat>=n?'★':'☆')+'</button>';}
   var fb=camStore[l.id]?.before||null,fa=camStore[l.id]?.after||null;
-  var _isValidImg=s=>s&&(s.startsWith('data:')||s.startsWith('http'));
+  var _isValidImg=s=>s&&(s.startsWith('data:')||s.startsWith('http'))&&s!=='[foto]'&&s!=='[foto]';
   var _srcB=fb||(_isValidImg(l.fotoBefore)?l.fotoBefore:null);
   var _srcA=fa||(_isValidImg(l.fotoAfter)?l.fotoAfter:null);
   var tbefore=_srcB?`<img src="${_srcB}" alt="" style="width:100%;height:100%;object-fit:cover;">`:`<span style="font-size:34px;">📷</span>`;
@@ -3412,6 +3428,16 @@ function compressImage(dataUrl, maxPx, quality, cb){
     cb(canvas.toDataURL('image/jpeg', quality));
   };
   img.src=dataUrl;
+}
+
+async function normalizeDriveUrl(url){
+  // Konversi format thumbnail lama ke uc?export=view yang lebih reliable
+  if(!url) return url;
+  const m = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  if(m && url.includes('drive.google.com/thumbnail')){
+    return 'https://drive.google.com/uc?export=view&id='+m[1];
+  }
+  return url;
 }
 
 async function uploadFotoToDrive(base64Data, fileName){
