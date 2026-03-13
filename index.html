@@ -2207,7 +2207,7 @@ function rMgrTable(l){
       <td><div class="rta">${x.area}</div><div class="rtb">${x.kategori}</div></td>
       <td><div class="rtm">${x.staff}</div></td>
       <td><div class="rtm">${x.upload}</div></td>
-      <td><div class="rtm" style="color:${x.sla==='BREACH'?'#ff5454':x.sla==='WARN'?'#ffaa3b':'var(--t2)'}">${x.durasi}m</div></td>
+      <td><div class="rtm" style="color:${x.sla==='BREACH'?'#ff5454':x.sla==='WARN'?'#ffaa3b':'var(--t2)'}">${(()=>{const _c=x.created||x.createdAt||x.tanggal;return x.status==='SELESAI'?(parseInt(x.durasi)||0):((_c?Math.round((Date.now()-new Date(_c).getTime())/60000):(parseInt(x.durasi)||0)))})()}m</div></td>
       <td><span class="pill p-${x.sla==='OK'?'ok':x.sla==='WARN'?'warn':'breach'}">${x.sla}</span></td>
       <td><span class="pill p-${x.status==='SELESAI'?'done':x.status==='IN PROGRESS'?'prog':'open'}">${x.status}</span></td>
       <td>${vfBadge}</td>
@@ -2437,7 +2437,7 @@ function submitTask(id){
     l[i].staff=CU.nama;
     // Gunakan foto dari camStore jika ada, fallback emoji
     l[i].fotoBefore=camStore[id]?.before||l[i].fotoBefore||'📷';
-    l[i].fotoAfter=camStore[id]?.after||'✨';
+    l[i].fotoAfter=camStore[id]?.after||l[i].fotoAfter||'✨';
     l[i].sla=calcSLAStatus(l[i]);
     DB.set('laporan',l);
     pushToServer('laporan', l);
@@ -2517,8 +2517,9 @@ function mkAssignCard(l){
   const sp=l.status==='IN PROGRESS'?'p-prog':'p-open';
   const k=DB.get('karyawan')||[];
   const staffOpts=k.filter(x=>['staff','internal'].includes(x.role)&&(x.aktif||x.status==='active')).map(x=>`<option value="${x.nama}"${l.staff===x.nama?' selected':''}>${x.nama}</option>`).join('');
-  const fb=camStore[l.id]?.before||null;
-  const hasBefore=!!(fb||l.fotoBefore);
+  const _isValidSrc=s=>s&&(s.startsWith('data:')||s.startsWith('http'));
+  const fb=camStore[l.id]?.before||(_isValidSrc(l.fotoBefore)?l.fotoBefore:null)||null;
+  const hasBefore=!!(fb);
   const thumbContent=fb
     ?`<img src="${fb}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:8px;">`
     :l.fotoBefore&&l.fotoBefore!=='null'
@@ -2701,8 +2702,11 @@ function mkVCard(l){
   var rat=l.rating||0,stars='';
   for(var n=1;n<=5;n++){stars+='<button class="star" onclick="setRating('+l.id+','+n+')" style="color:'+(rat>=n?'var(--yellow)':'var(--t4)')+';color:'+(rat>=n?'var(--yellow)':'var(--t4)')+';">'+(rat>=n?'★':'☆')+'</button>';}
   var fb=camStore[l.id]?.before||null,fa=camStore[l.id]?.after||null;
-  var tbefore=fb?`<img src="${fb}" alt="" style="width:100%;height:100%;object-fit:cover;">`:l.fotoBefore&&l.fotoBefore.length>2?`<img src="${l.fotoBefore}" alt="" style="width:100%;height:100%;object-fit:cover;">`:`<span style="font-size:34px;">${l.fotoBefore||'📷'}</span>`;
-  var tafter=fa?`<img src="${fa}" alt="" style="width:100%;height:100%;object-fit:cover;">`:l.fotoAfter&&l.fotoAfter.length>2?`<img src="${l.fotoAfter}" alt="" style="width:100%;height:100%;object-fit:cover;">`:`<span style="font-size:34px;">${l.fotoAfter||'✨'}</span>`;
+  var _isValidImg=s=>s&&(s.startsWith('data:')||s.startsWith('http'));
+  var _srcB=fb||(_isValidImg(l.fotoBefore)?l.fotoBefore:null);
+  var _srcA=fa||(_isValidImg(l.fotoAfter)?l.fotoAfter:null);
+  var tbefore=_srcB?`<img src="${_srcB}" alt="" style="width:100%;height:100%;object-fit:cover;">`:`<span style="font-size:34px;">📷</span>`;
+  var tafter=_srcA?`<img src="${_srcA}" alt="" style="width:100%;height:100%;object-fit:cover;">`:`<span style="font-size:34px;">✨</span>`;
   var ratingLabel=rat?rat+'/5':'Belum dinilai';
   return `<div class="vcard">
     <div class="vc-main">
@@ -3278,13 +3282,8 @@ function camConfirm(){
       if(camType==='before'&&camStore[camTask]?.before){l[i].fotoBefore=camStore[camTask].before;}
       if(camType==='after'&&camStore[camTask]?.after){l[i].fotoAfter=camStore[camTask].after;}
       DB.set('laporan',l);
-      // Push tanpa base64 foto agar tidak oversize
-      // Strip foto sebelum push ke Sheets agar tidak oversize
-      const _ls=l.map(x=>({...x,
-        fotoBefore:x.fotoBefore&&x.fotoBefore.startsWith('data:')?'[foto]':x.fotoBefore,
-        fotoAfter: x.fotoAfter &&x.fotoAfter .startsWith('data:')?'[foto]':x.fotoAfter
-      }));
-      pushToServer('laporan',_ls);
+      // Foto sudah dikompres ~80KB - push utuh ke Sheets agar bisa dilihat semua device
+      pushToServer('laporan',l);
     }
   }
   if(isSpvRole&&!isStaffRole){setTimeout(()=>rSpv(),200);}
@@ -3417,12 +3416,8 @@ function saveLaporan(){
     fotoBefore: _lapBeforeData, fotoAfter:null
   });
   DB.set('laporan',l);
-  // Push ke server - strip foto base64 agar tidak oversize di Sheets
-  const _lSrv = l.map(x=>({...x,
-    fotoBefore: x.fotoBefore&&x.fotoBefore.startsWith('data:')?'[foto]':x.fotoBefore,
-    fotoAfter:  x.fotoAfter &&x.fotoAfter .startsWith('data:')?'[foto]':x.fotoAfter
-  }));
-  pushToServer('laporan', _lSrv);
+  // Foto sudah dikompres ~80KB - push utuh ke Sheets
+  pushToServer('laporan', l);
   _lapBeforeData=null;
   closeModal('mLaporan');
   showToast('✅ Laporan dibuat · Foto Before tersimpan');
@@ -3614,22 +3609,25 @@ function updateKlaimBadge(){
 }
 
 function autoBreachCheck(){
-  // Setiap buka app: cek semua laporan IN PROGRESS yang dibuat SEBELUM hari ini
-  // → otomatis jadi BREACH (pekerjaan tidak selesai hari itu)
   const laps = DB.get('laporan')||[];
   const todayStr = new Date().toISOString().slice(0,10);
+  const cfg = getSLA();
+  const tgt = {URGENT:cfg.urgent,HIGH:cfg.high,MEDIUM:cfg.medium,LOW:cfg.low};
   let changed = false;
   laps.forEach(x => {
-    if(x.status !== 'IN PROGRESS' && x.status !== 'OPEN' && x.status !== 'PENDING') return;
-    // Ambil tanggal dibuat
+    if(x.status==='SELESAI'||x.status==='BREACH') return;
     const createdDate = (x.tanggal||x.createdAt||x.created||'').slice(0,10);
-    if(!createdDate) return;
-    // Kalau bukan hari ini → BREACH
-    if(createdDate < todayStr){
+    const createdTs = x.created||x.createdAt||x.tanggal||null;
+    const elapsed = createdTs ? Math.round((Date.now()-new Date(createdTs).getTime())/60000) : 0;
+    const target = tgt[(x.prioritas||'').toUpperCase()]||60;
+    // BREACH jika: dibuat sebelum hari ini ATAU elapsed sudah melebihi SLA target
+    const isOldDay = createdDate && createdDate < todayStr;
+    const isOverSLA = elapsed > 0 && elapsed >= target;
+    if(isOldDay || isOverSLA){
       x.status = 'BREACH';
       x.isBreach = true;
       x.breachAt = x.breachAt || new Date().toISOString();
-      x.breachReason = 'Tidak diselesaikan pada hari yang sama';
+      x.breachReason = isOldDay ? 'Tidak diselesaikan pada hari yang sama' : 'Melewati target SLA '+target+' menit';
       x.sla = 'BREACH';
       changed = true;
     }
@@ -4264,11 +4262,35 @@ function startPolling(){
   if(_pollInterval) clearInterval(_pollInterval);
   pollNow(); // langsung poll pertama kali
   _pollInterval = setInterval(pollNow, 30000);
-  // Refresh card setiap 60 detik agar durasi live terupdate
+  // Update durasi & SLA setiap 60 detik TANPA rebuild DOM (card tidak tertutup)
   setInterval(()=>{
-    if(CU){
+    if(!CU) return;
+    const laps = DB.get('laporan')||[];
+    let breachChanged = false;
+    laps.forEach(x => {
+      if(x.status==='SELESAI'||x.status==='BREACH') return;
+      const _c = x.created||x.createdAt||x.tanggal||null;
+      if(!_c) return;
+      const _elapsed = Math.round((Date.now()-new Date(_c).getTime())/60000);
+      const cfg = getSLA(), tgt = {URGENT:cfg.urgent,HIGH:cfg.high,MEDIUM:cfg.medium,LOW:cfg.low};
+      const _target = tgt[(x.prioritas||'').toUpperCase()]||60;
+      // Update durasi pill di card kalau elemen ada
+      const pillEl = document.querySelector('.pill[data-lid="'+x.id+'"]');
+      if(pillEl) pillEl.textContent = _elapsed+'mnt';
+      // Auto breach jika elapsed > target
+      if(_elapsed >= _target && x.sla !== 'BREACH'){
+        x.sla = 'BREACH'; x.status = 'BREACH'; x.isBreach = true;
+        x.breachAt = x.breachAt||new Date().toISOString();
+        breachChanged = true;
+      }
+    });
+    if(breachChanged){
+      DB.set('laporan', laps);
+      pushToServer('laporan', laps);
+      // Refresh tampilan setelah breach
       if(['staff','internal'].includes(CU.role)) rStaff();
-      else if(['coordinator','supervisor'].includes(CU.role)) rSpv();
+      else if(['coordinator','supervisor','manager'].includes(CU.role)) rSpv();
+      if(document.getElementById('scrManager')?.classList.contains('active')) rManager();
     }
   }, 60000);
 }
