@@ -260,7 +260,7 @@ table.dt tr:last-child td{border:none;}
 .star{font-size:22px;background:none;border:none;padding:1px;cursor:pointer;}
 .star-ct{font-size:15px;color:var(--t2);margin-left:5px;}
 .vc-actions{display:flex;gap:6px;flex-wrap:wrap;}
-.lightbox{position:fixed;inset:0;z-index:900;background:rgba(0,0,0,.93);display:none;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(14px);}
+.lightbox{position:fixed;inset:0;z-index:1200;background:rgba(0,0,0,.93);display:none;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(14px);}
 .lightbox.open{display:flex;animation:bfade .2s ease;}
 @keyframes bfade{from{opacity:0}to{opacity:1}}
 .lb-inner{position:relative;max-width:min(680px,90vw);}
@@ -275,7 +275,7 @@ table.dt tr:last-child td{border:none;}
 .btn-gray:hover{background:var(--bg4);color:var(--t1);}
 .btn-sm{padding:6px 12px;font-size:14px;}
 .btn-excel{background:linear-gradient(135deg,#14532d,#166534);color:#fff;}
-.modal-bg{position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.65);backdrop-filter:blur(10px);display:none;align-items:flex-end;justify-content:center;padding:0;}
+.modal-bg{position:fixed;inset:0;z-index:1100;background:rgba(0,0,0,.65);backdrop-filter:blur(10px);display:none;align-items:flex-end;justify-content:center;padding:0;}
 .modal-bg.open{display:flex;animation:bfade .2s ease;}
 .modal-card{background:var(--bg2);border:1px solid var(--line2);border-top-left-radius:var(--r-xl);border-top-right-radius:var(--r-xl);border-bottom-left-radius:0;border-bottom-right-radius:0;width:100%;max-width:500px;max-height:92vh;overflow-y:auto;box-shadow:0 -8px 40px rgba(0,0,0,.5);padding-bottom:calc(env(safe-area-inset-bottom) + 24px);}
 .mhdr{display:flex;align-items:center;justify-content:space-between;padding:20px 22px 16px;border-bottom:1px solid var(--line1);}
@@ -1463,7 +1463,26 @@ table.dt tr:last-child td{border:none;}
           apiCall({action:'setData', key:'karyawan', value:merged}).catch(()=>{});
         }
       }
-      if (d.laporan)    localStorage.setItem('click_laporan',     JSON.stringify(d.laporan));
+      if (d.laporan) {
+        // Merge laporan: ambil data server tapi pertahankan foto & durasi dari lokal
+        const localLap = JSON.parse(localStorage.getItem('click_laporan')||'[]');
+        const localMap = {};
+        localLap.forEach(x => { localMap[x.id] = x; });
+        const merged = d.laporan.map(srv => {
+          const loc = localMap[srv.id];
+          if (!loc) return srv;
+          // Pertahankan foto lokal jika server hanya punya placeholder
+          const fotoBefore = (srv.fotoBefore==='[foto]'||!srv.fotoBefore) ? (loc.fotoBefore||srv.fotoBefore) : srv.fotoBefore;
+          const fotoAfter  = (srv.fotoAfter==='[foto]' ||!srv.fotoAfter)  ? (loc.fotoAfter ||srv.fotoAfter)  : srv.fotoAfter;
+          // Pertahankan durasi lokal jika server punya 0 atau kosong
+          const durasi = (srv.durasi==='0'||srv.durasi===0||!srv.durasi) ? (loc.durasi||srv.durasi) : srv.durasi;
+          return {...srv, fotoBefore, fotoAfter, durasi};
+        });
+        // Tambah laporan lokal yang belum ada di server
+        const serverIds = new Set(d.laporan.map(x=>x.id));
+        localLap.filter(x=>!serverIds.has(x.id)).forEach(x=>merged.push(x));
+        localStorage.setItem('click_laporan', JSON.stringify(merged));
+      }
       // MERGE area: pertahankan data lokal yang belum ada di server
       if (d.area) {
         const localA = JSON.parse(localStorage.getItem('click_area')||'[]');
@@ -2332,6 +2351,10 @@ function mkCard(l){
   const pm={URGENT:'ps-u',HIGH:'ps-h',MEDIUM:'ps-m',LOW:'ps-l'};
   const sp=l.status==='SELESAI'?'p-done':l.status==='IN PROGRESS'?'p-prog':'p-open';
   const sc=l.sla==='OK'?'p-ok':l.sla==='WARN'?'p-warn':'p-breach';
+  // Hitung durasi live dari created (bukan dari l.durasi yg bisa 0)
+  const _created = l.created||l.createdAt||l.tanggal||null;
+  const _liveDur = _created ? Math.round((Date.now()-new Date(_created).getTime())/60000) : (parseInt(l.durasi)||0);
+  const _showDur = l.status==='SELESAI' ? (parseInt(l.durasi)||_liveDur) : _liveDur;
   const hB=!!(camStore[l.id]?.before||l.fotoBefore),hA=!!(camStore[l.id]?.after||l.fotoAfter);
   const done=l.status==='SELESAI';
   const _fB=camStore[l.id]?.before||l.fotoBefore||null;
@@ -2340,7 +2363,7 @@ function mkCard(l){
   const slotB=hB?(_isImg(_fB)?`<img src="${_fB}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">`:`<div style="position:absolute;inset:0;background:var(--bg4);display:flex;align-items:center;justify-content:center;font-size:30px;">${_fB||'📷'}</div>`):`<div class="pe"><div class="pei">📷</div><p class="pet">Foto Sebelum</p><p class="pes">Tap untuk ambil</p></div>`;
   const slotA=hA?(_isImg(_fA)?`<img src="${_fA}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">`:`<div style="position:absolute;inset:0;background:var(--bg4);display:flex;align-items:center;justify-content:center;font-size:30px;">${_fA||'✨'}</div>`):`<div class="pe"><div class="pei">📷</div><p class="pet">Foto Sesudah</p><p class="pes">Setelah selesai</p></div>`;
   const body=done?`<div class="pgrid"><div class="pslot fi" style="cursor:default">${slotB}<span class="ptag ptb">Sebelum ✓</span></div><div class="pslot fi" style="cursor:default">${slotA}<span class="ptag pta">Sesudah ✓</span></div></div><div style="padding:10px 12px;background:var(--green-f);border-radius:var(--r-sm);border:1px solid rgba(48,217,122,.18);font-size:15px;color:var(--green);font-weight:600;text-align:center;">✓ Laporan terkirim · Diverifikasi ${l.supervisor}</div>`:`<div class="pgrid"><div class="pslot${hB?' fi':''}" onclick="${hB?'openPhotoView('+l.id+',\'before\')':'openCam('+l.id+',\'before\')'};event.stopPropagation()">${slotB}<span class="ptag ptb">Sebelum${hB?' ✓':''}</span></div><div class="pslot${hA?' fi':''}" onclick="${hA?'openPhotoView('+l.id+',\'after\')':'openCam('+l.id+',\'after\')'};event.stopPropagation()">${slotA}<span class="ptag pta">Sesudah${hA?' ✓':''}</span></div></div><button class="ab ab-b" onclick="openCam(${l.id},'before');event.stopPropagation()">📷 ${hB?'Ulangi':'Ambil'} Foto Sebelum</button><button class="ab ab-a"${!hB?' disabled':''} onclick="openCam(${l.id},'after');event.stopPropagation()">✓ Ambil Foto Sesudah</button><button class="ab ab-s"${!(hB&&hA)?' disabled':''} onclick="submitTask(${l.id});event.stopPropagation()">Selesaikan &amp; Kirim Laporan</button>`;
-  return `<div class="tc" onclick="toggleCard(this)"><div class="tcp"><div class="ps ${pm[l.prioritas]||'ps-m'}"></div><div class="tr1"><div><div class="tan">${l.area}</div><div class="tca">${l.kategori}</div></div><span class="pill ${sp}">${l.status}</span></div><div class="tmeta"><span>📍 ${l.area}</span><span class="pill ${sc}" style="padding:2px 8px;font-size:13px">${l.sla==='BREACH'?'BREACH':l.durasi+'mnt'}</span>${l.supervisor?`<span>👔 ${l.supervisor}</span>`:''}</div></div><div class="tb" id="tb-${l.id}">${body}</div></div>`;
+  return `<div class="tc" onclick="toggleCard(this)"><div class="tcp"><div class="ps ${pm[l.prioritas]||'ps-m'}"></div><div class="tr1"><div><div class="tan">${l.area}</div><div class="tca">${l.kategori}</div></div><span class="pill ${sp}">${l.status}</span></div><div class="tmeta"><span>📍 ${l.area}</span><span class="pill ${sc}" style="padding:2px 8px;font-size:13px">${l.sla==='BREACH'?'BREACH':_showDur+'mnt'}</span>${l.supervisor?`<span>👔 ${l.supervisor}</span>`:''}</div></div><div class="tb" id="tb-${l.id}">${body}</div></div>`;
 }
 let _spvKPI={pending:true,verified:false,breach:false};
 
@@ -2406,10 +2429,11 @@ function toggleCard(card){const b=card.querySelector('.tb'),op=b.classList.conta
 function submitTask(id){
   const l=DB.get('laporan')||[],i=l.findIndex(x=>x.id===id);
   if(i>=0){
-    const dur=l[i].created?Math.round((Date.now()-new Date(l[i].created).getTime())/60000):0;
+    const createdTs = l[i].created||l[i].createdAt||l[i].tanggal||null;
+    const dur = createdTs ? Math.round((Date.now()-new Date(createdTs).getTime())/60000) : (parseInt(l[i].durasi)||0);
     l[i].status='SELESAI';
     l[i].selesai=new Date().toLocaleString('id-ID');
-    l[i].durasi=dur||l[i].durasi;
+    l[i].durasi=dur>0?dur:(parseInt(l[i].durasi)||1);
     l[i].staff=CU.nama;
     // Gunakan foto dari camStore jika ada, fallback emoji
     l[i].fotoBefore=camStore[id]?.before||l[i].fotoBefore||'📷';
@@ -3255,8 +3279,12 @@ function camConfirm(){
       if(camType==='after'&&camStore[camTask]?.after){l[i].fotoAfter=camStore[camTask].after;}
       DB.set('laporan',l);
       // Push tanpa base64 foto agar tidak oversize
-      // Foto sudah dikompres ~80KB - aman push ke Sheets
-      pushToServer('laporan',l);
+      // Strip foto sebelum push ke Sheets agar tidak oversize
+      const _ls=l.map(x=>({...x,
+        fotoBefore:x.fotoBefore&&x.fotoBefore.startsWith('data:')?'[foto]':x.fotoBefore,
+        fotoAfter: x.fotoAfter &&x.fotoAfter .startsWith('data:')?'[foto]':x.fotoAfter
+      }));
+      pushToServer('laporan',_ls);
     }
   }
   if(isSpvRole&&!isStaffRole){setTimeout(()=>rSpv(),200);}
@@ -3382,15 +3410,19 @@ function saveLaporan(){
     supervisor: CU.nama,
     assignedBy: staff!=='-'?CU.nama:null,
     created: now.toISOString(),
+    createdAt: now.toISOString(),
+    tanggal: now.toISOString().slice(0,10),
     upload: lbl, selesai:'-', durasi:'0', sla:'OK',
     rating:0, catatan:cat, verified:false,
     fotoBefore: _lapBeforeData, fotoAfter:null
   });
   DB.set('laporan',l);
-  // Push ke server agar semua device sync
-  // Foto base64 bisa besar — simpan tanpa foto dulu ke server, foto tetap di lokal
-  // Foto sudah dikompres ~80KB - aman push langsung ke Sheets
-  pushToServer('laporan', l);
+  // Push ke server - strip foto base64 agar tidak oversize di Sheets
+  const _lSrv = l.map(x=>({...x,
+    fotoBefore: x.fotoBefore&&x.fotoBefore.startsWith('data:')?'[foto]':x.fotoBefore,
+    fotoAfter:  x.fotoAfter &&x.fotoAfter .startsWith('data:')?'[foto]':x.fotoAfter
+  }));
+  pushToServer('laporan', _lSrv);
   _lapBeforeData=null;
   closeModal('mLaporan');
   showToast('✅ Laporan dibuat · Foto Before tersimpan');
@@ -4232,6 +4264,13 @@ function startPolling(){
   if(_pollInterval) clearInterval(_pollInterval);
   pollNow(); // langsung poll pertama kali
   _pollInterval = setInterval(pollNow, 30000);
+  // Refresh card setiap 60 detik agar durasi live terupdate
+  setInterval(()=>{
+    if(CU){
+      if(['staff','internal'].includes(CU.role)) rStaff();
+      else if(['coordinator','supervisor'].includes(CU.role)) rSpv();
+    }
+  }, 60000);
 }
 
 function stopPolling(){
