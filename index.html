@@ -64,7 +64,7 @@ input,select{outline:none;}
 .login-btn:active{transform:scale(.98);}
 .login-foot{text-align:center;margin-top:14px;font-size:15px;color:var(--t3);}
 #pgApp{display:flex;flex-direction:column;height:100vh;overflow:hidden;background:var(--bg1);}
-.navbar{position:relative;z-index:400;height:52px;flex-shrink:0;background:rgba(8,18,31,.93);backdrop-filter:blur(40px);-webkit-backdrop-filter:blur(40px);border-bottom:1px solid var(--line1);display:flex;align-items:center;justify-content:space-between;padding:0 18px;}
+.navbar{position:relative;z-index:400;min-height:52px;flex-shrink:0;background:rgba(8,18,31,.93);backdrop-filter:blur(40px);-webkit-backdrop-filter:blur(40px);border-bottom:1px solid var(--line1);display:flex;align-items:center;justify-content:space-between;padding:0 18px;flex-wrap:wrap;gap:4px;}
 .nb-brand{display:flex;align-items:center;gap:10px;}
 .nb-icon{width:30px;height:30px;background:linear-gradient(145deg,#1c5caa,#0e3a72);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:900;color:var(--blue);}
 .nb-name{font-size:17px;font-weight:800;letter-spacing:1px;color:var(--t1);}
@@ -311,27 +311,29 @@ table.dt tr:last-child td{border:none;}
 /* ══════════ MOBILE via CSS Media Query ══════════ */
 @media (max-width: 767px) {
   .side { display: none !important; }
-  .nb-tabs { display: none !important; }
+  .nb-tabs { display: flex !important; overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; max-width: 100%; flex-shrink: 1; }
+  .nb-tabs::-webkit-scrollbar { display: none; }
+  .nb-tab { padding: 4px 11px; font-size: 13px; white-space: nowrap; flex-shrink: 0; }
   .nb-un { display: none !important; }
   .bnav { display: flex !important; }
   #adminMobileTabs, #mgrMobileTabs { display: block !important; }
   .screen.active { flex-direction: column; }
   #scrAdmin > div, #scrManager > div { flex-direction: column !important; width: 100%; height: 100%; overflow: hidden; }
-  #scrManager .mscroll, #scrManager .manager-wrap { padding-bottom: 140px !important; }
+  #scrManager .mscroll, #scrManager .manager-wrap { padding-bottom: 160px !important; }
   .scroll-body { flex: 1; overflow-y: auto; min-height: 0; }
-  .inner { padding: 14px 12px 140px !important; }
-  .mgr-left { padding-bottom: 140px !important; }
-  .sscroll, .scroll-body { padding-bottom: 140px !important; }
+  .inner { padding: 14px 12px 160px !important; }
+  .mgr-left { padding-bottom: 160px !important; }
+  .sscroll, .scroll-body { padding-bottom: 160px !important; }
   .krow { grid-template-columns: 1fr 1fr !important; }
   .sr { grid-template-columns: 1fr 1fr !important; }
   .two { grid-template-columns: 1fr !important; }
   .ph { flex-direction: column; gap: 8px; }
-  .sscroll { padding-bottom: 140px !important; }
+  .sscroll { padding-bottom: 160px !important; }
   .fab { bottom: 68px !important; }
   .fab-dial { bottom: 68px !important; }
-  .spvs { padding-bottom: 140px !important; }
-  .mgr-tbl-wrap { padding-bottom: 140px !important; }
-  .navbar { padding: 0 12px; }
+  .spvs { padding-bottom: 160px !important; }
+  .mgr-tbl-wrap { padding-bottom: 160px !important; }
+  .navbar { padding: 0 12px; flex-wrap: wrap; min-height: 52px; height: auto; }
   .nb-brand .nb-name { font-size: 13px; }
 }
 @media (min-width: 768px) {
@@ -357,7 +359,7 @@ table.dt tr:last-child td{border:none;}
 .mgr-right{display:flex;flex-direction:column;overflow:hidden;}
 .mgr-right-hdr{padding:12px 16px 8px;border-bottom:1px solid var(--line1);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
 .mgr-right-hdr .phdt{font-size:16px;font-weight:700;color:var(--t1);}
-.mgr-tbl-wrap{flex:1;overflow:auto;padding-bottom:100px;}
+.mgr-tbl-wrap{flex:1;overflow-y:auto;overflow-x:hidden;padding-bottom:160px;}
 .mgr-filter-badge{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:6px;font-size:14px;font-weight:600;}
 .mgr-filter-badge.f-all{background:var(--bg3);color:var(--t2);}
 .mgr-filter-badge.f-done{background:rgba(59,158,255,.12);color:var(--blue);}
