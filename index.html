@@ -317,19 +317,20 @@ table.dt tr:last-child td{border:none;}
   #adminMobileTabs, #mgrMobileTabs { display: block !important; }
   .screen.active { flex-direction: column; }
   #scrAdmin > div, #scrManager > div { flex-direction: column !important; width: 100%; height: 100%; overflow: hidden; }
-  #scrManager .mscroll, #scrManager .manager-wrap { padding-bottom: 80px !important; }
+  #scrManager .mscroll, #scrManager .manager-wrap { padding-bottom: 140px !important; }
   .scroll-body { flex: 1; overflow-y: auto; min-height: 0; }
-  .inner { padding: 14px 12px 80px !important; }
-  .mgr-left { padding-bottom: 72px !important; }
-  .sscroll, .scroll-body { padding-bottom: 72px !important; }
+  .inner { padding: 14px 12px 140px !important; }
+  .mgr-left { padding-bottom: 140px !important; }
+  .sscroll, .scroll-body { padding-bottom: 140px !important; }
   .krow { grid-template-columns: 1fr 1fr !important; }
   .sr { grid-template-columns: 1fr 1fr !important; }
   .two { grid-template-columns: 1fr !important; }
   .ph { flex-direction: column; gap: 8px; }
-  .sscroll { padding-bottom: 72px !important; }
+  .sscroll { padding-bottom: 140px !important; }
   .fab { bottom: 68px !important; }
   .fab-dial { bottom: 68px !important; }
-  .spvs { padding-bottom: 72px !important; }
+  .spvs { padding-bottom: 140px !important; }
+  .mgr-tbl-wrap { padding-bottom: 140px !important; }
   .navbar { padding: 0 12px; }
   .nb-brand .nb-name { font-size: 13px; }
 }
@@ -2331,8 +2332,11 @@ function mkCard(l){
   const sc=l.sla==='OK'?'p-ok':l.sla==='WARN'?'p-warn':'p-breach';
   const hB=!!(camStore[l.id]?.before||l.fotoBefore),hA=!!(camStore[l.id]?.after||l.fotoAfter);
   const done=l.status==='SELESAI';
-  const slotB=hB?`<div style="position:absolute;inset:0;background:var(--bg4);display:flex;align-items:center;justify-content:center;font-size:30px;">${l.fotoBefore||'📷'}</div>`:`<div class="pe"><div class="pei">📷</div><p class="pet">Foto Sebelum</p><p class="pes">Tap untuk ambil</p></div>`;
-  const slotA=hA?`<div style="position:absolute;inset:0;background:var(--bg4);display:flex;align-items:center;justify-content:center;font-size:30px;">${l.fotoAfter||'✨'}</div>`:`<div class="pe"><div class="pei">📷</div><p class="pet">Foto Sesudah</p><p class="pes">Setelah selesai</p></div>`;
+  const _fB=camStore[l.id]?.before||l.fotoBefore||null;
+  const _fA=camStore[l.id]?.after||l.fotoAfter||null;
+  const _isImg=src=>src&&(src.startsWith('data:')||src.startsWith('http'));
+  const slotB=hB?(_isImg(_fB)?`<img src="${_fB}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">`:`<div style="position:absolute;inset:0;background:var(--bg4);display:flex;align-items:center;justify-content:center;font-size:30px;">${_fB||'📷'}</div>`):`<div class="pe"><div class="pei">📷</div><p class="pet">Foto Sebelum</p><p class="pes">Tap untuk ambil</p></div>`;
+  const slotA=hA?(_isImg(_fA)?`<img src="${_fA}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">`:`<div style="position:absolute;inset:0;background:var(--bg4);display:flex;align-items:center;justify-content:center;font-size:30px;">${_fA||'✨'}</div>`):`<div class="pe"><div class="pei">📷</div><p class="pet">Foto Sesudah</p><p class="pes">Setelah selesai</p></div>`;
   const body=done?`<div class="pgrid"><div class="pslot fi" style="cursor:default">${slotB}<span class="ptag ptb">Sebelum ✓</span></div><div class="pslot fi" style="cursor:default">${slotA}<span class="ptag pta">Sesudah ✓</span></div></div><div style="padding:10px 12px;background:var(--green-f);border-radius:var(--r-sm);border:1px solid rgba(48,217,122,.18);font-size:15px;color:var(--green);font-weight:600;text-align:center;">✓ Laporan terkirim · Diverifikasi ${l.supervisor}</div>`:`<div class="pgrid"><div class="pslot${hB?' fi':''}" onclick="${hB?'openPhotoView('+l.id+',\'before\')':'openCam('+l.id+',\'before\')'};event.stopPropagation()">${slotB}<span class="ptag ptb">Sebelum${hB?' ✓':''}</span></div><div class="pslot${hA?' fi':''}" onclick="${hA?'openPhotoView('+l.id+',\'after\')':'openCam('+l.id+',\'after\')'};event.stopPropagation()">${slotA}<span class="ptag pta">Sesudah${hA?' ✓':''}</span></div></div><button class="ab ab-b" onclick="openCam(${l.id},'before');event.stopPropagation()">📷 ${hB?'Ulangi':'Ambil'} Foto Sebelum</button><button class="ab ab-a"${!hB?' disabled':''} onclick="openCam(${l.id},'after');event.stopPropagation()">✓ Ambil Foto Sesudah</button><button class="ab ab-s"${!(hB&&hA)?' disabled':''} onclick="submitTask(${l.id});event.stopPropagation()">Selesaikan &amp; Kirim Laporan</button>`;
   return `<div class="tc" onclick="toggleCard(this)"><div class="tcp"><div class="ps ${pm[l.prioritas]||'ps-m'}"></div><div class="tr1"><div><div class="tan">${l.area}</div><div class="tca">${l.kategori}</div></div><span class="pill ${sp}">${l.status}</span></div><div class="tmeta"><span>📍 ${l.area}</span><span class="pill ${sc}" style="padding:2px 8px;font-size:13px">${l.sla==='BREACH'?'BREACH':l.durasi+'mnt'}</span>${l.supervisor?`<span>👔 ${l.supervisor}</span>`:''}</div></div><div class="tb" id="tb-${l.id}">${body}</div></div>`;
 }
@@ -3205,16 +3209,33 @@ function openCam(tid,type){
   document.getElementById('cam-modal').classList.add('open');
 }
 function triggerCam(){document.getElementById('fileInput').click();}
+function compressImage(dataUrl, maxPx, quality, cb){
+  const img = new Image();
+  img.onload = function(){
+    let w=img.width, h=img.height;
+    if(w>maxPx||h>maxPx){
+      if(w>h){h=Math.round(h*maxPx/w);w=maxPx;}
+      else{w=Math.round(w*maxPx/h);h=maxPx;}
+    }
+    const canvas=document.createElement('canvas');
+    canvas.width=w; canvas.height=h;
+    canvas.getContext('2d').drawImage(img,0,0,w,h);
+    cb(canvas.toDataURL('image/jpeg', quality));
+  };
+  img.src=dataUrl;
+}
 function handleFile(e){
   const f=e.target.files[0];if(!f)return;
   const r=new FileReader();
   r.onload=ev=>{
-    document.getElementById('cImg').src=ev.target.result;
-    document.getElementById('cPrev').style.display='block';
-    document.getElementById('cOpen').style.display='none';
-    document.getElementById('cConf').style.display='flex';
-    camStore[camTask]=camStore[camTask]||{};
-    camStore[camTask][camType]=ev.target.result;
+    compressImage(ev.target.result, 1024, 0.7, function(compressed){
+      document.getElementById('cImg').src=compressed;
+      document.getElementById('cPrev').style.display='block';
+      document.getElementById('cOpen').style.display='none';
+      document.getElementById('cConf').style.display='flex';
+      camStore[camTask]=camStore[camTask]||{};
+      camStore[camTask][camType]=compressed;
+    });
   };
   r.readAsDataURL(f);e.target.value='';
 }
@@ -3232,8 +3253,8 @@ function camConfirm(){
       if(camType==='after'&&camStore[camTask]?.after){l[i].fotoAfter=camStore[camTask].after;}
       DB.set('laporan',l);
       // Push tanpa base64 foto agar tidak oversize
-      const _lSrv=l.map(x=>({...x,fotoBefore:x.fotoBefore?.startsWith('data:')?'[foto]':x.fotoBefore,fotoAfter:x.fotoAfter?.startsWith('data:')?'[foto]':x.fotoAfter}));
-      pushToServer('laporan',_lSrv);
+      // Foto sudah dikompres ~80KB - aman push ke Sheets
+      pushToServer('laporan',l);
     }
   }
   if(isSpvRole&&!isStaffRole){setTimeout(()=>rSpv(),200);}
@@ -3318,13 +3339,15 @@ function handleLapFile(e){
   const f=e.target.files[0]; if(!f) return;
   const r=new FileReader();
   r.onload=ev=>{
-    _lapBeforeData = ev.target.result;
-    const img=document.getElementById('lapBeforeImg');
-    img.src=_lapBeforeData; img.style.display='block';
-    document.getElementById('lapBeforeEmpty').style.display='none';
-    document.getElementById('lapBeforeTaken').style.display='block';
-    document.getElementById('lapBeforePreview').style.borderColor='var(--green)';
-    document.getElementById('lapBeforeWarn').style.display='none';
+    compressImage(ev.target.result, 1024, 0.7, function(compressed){
+      _lapBeforeData = compressed;
+      const img=document.getElementById('lapBeforeImg');
+      img.src=_lapBeforeData; img.style.display='block';
+      document.getElementById('lapBeforeEmpty').style.display='none';
+      document.getElementById('lapBeforeTaken').style.display='block';
+      document.getElementById('lapBeforePreview').style.borderColor='var(--green)';
+      document.getElementById('lapBeforeWarn').style.display='none';
+    });
   };
   r.readAsDataURL(f); e.target.value='';
 }
@@ -3364,8 +3387,8 @@ function saveLaporan(){
   DB.set('laporan',l);
   // Push ke server agar semua device sync
   // Foto base64 bisa besar — simpan tanpa foto dulu ke server, foto tetap di lokal
-  const lForServer = l.map(x=>({...x, fotoBefore: x.fotoBefore&&x.fotoBefore.startsWith('data:')?'[foto]':x.fotoBefore, fotoAfter: x.fotoAfter&&x.fotoAfter.startsWith('data:')?'[foto]':x.fotoAfter}));
-  pushToServer('laporan', lForServer);
+  // Foto sudah dikompres ~80KB - aman push langsung ke Sheets
+  pushToServer('laporan', l);
   _lapBeforeData=null;
   closeModal('mLaporan');
   showToast('✅ Laporan dibuat · Foto Before tersimpan');
