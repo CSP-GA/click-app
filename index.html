@@ -422,41 +422,28 @@ table.dt tr:last-child td{border:none;}
       <button class="switch-btn" onclick="clearRemembered()">Gunakan akun lain</button>
     </div>
     <div id="loginForm">
-      <!-- Step 1: Input Email -->
-      <div id="loginStep1">
-        <div class="fgroup">
-          <div class="frow">
-            <div class="fico">✉️</div>
-            <input class="finp" id="loginEmail" type="email" placeholder="Email Google Anda" autocomplete="email" inputmode="email" style="background:transparent;border:none;color:var(--t1);font-size:17px;width:100%;" onkeydown="if(event.key==='Enter')requestOTP()">
-          </div>
+      <div class="fgroup">
+        <div class="frow">
+          <div class="fico">👤</div>
+          <input class="finp" id="loginUser" type="text" placeholder="Ketik nama Anda" autocomplete="off" style="background:transparent;border:none;color:var(--t1);font-size:17px;width:100%;" onkeydown="if(event.key==='Enter')document.getElementById('loginPin').focus()">
         </div>
-        <button class="login-btn" id="btnKirimOTP" onclick="requestOTP()">Kirim OTP</button>
+        <div class="frow">
+          <div class="fico">🔒</div>
+          <input class="finp pin-inp" type="password" id="loginPin" placeholder="PIN 4 digit" maxlength="4" inputmode="numeric" autocomplete="off" onkeydown="if(event.key==='Enter')doLogin()">
+          <button class="pin-eye" id="pinEye" onclick="togglePin()">👁</button>
+        </div>
       </div>
-      <!-- Step 2: Input OTP -->
-      <div id="loginStep2" style="display:none">
-        <div style="text-align:center;padding:8px 0 14px;font-size:14px;color:var(--t2)">Kode OTP dikirim ke<br><span id="otpEmailDisplay" style="color:var(--blue);font-weight:600;word-break:break-all"></span></div>
-        <div class="fgroup">
-          <div class="frow">
-            <div class="fico">🔑</div>
-            <input class="finp" id="loginOTP" type="text" placeholder="6 digit kode OTP" maxlength="6" inputmode="numeric" autocomplete="one-time-code" style="background:transparent;border:none;color:var(--t1);font-size:24px;letter-spacing:8px;width:100%;text-align:center;" onkeydown="if(event.key==='Enter')verifyOTP()">
-          </div>
-        </div>
-        <div class="toggle-row">
-          <label class="ios-sw">
-            <input type="checkbox" id="rememberMe">
-            <div class="sw-track"></div>
-            <div class="sw-thumb"></div>
-          </label>
-          <span class="toggle-lbl">Ingat akun di perangkat ini</span>
-        </div>
-        <button class="login-btn" id="btnVerifOTP" onclick="verifyOTP()">Verifikasi & Masuk</button>
-        <div style="display:flex;justify-content:space-between;margin-top:10px;">
-          <button onclick="backToEmailStep()" style="background:none;border:none;color:var(--t3);font-size:14px;cursor:pointer;padding:4px 0;">← Ganti Email</button>
-          <button onclick="requestOTP(true)" style="background:none;border:none;color:var(--blue);font-size:14px;cursor:pointer;padding:4px 0;">Kirim Ulang OTP</button>
-        </div>
-        <div style="text-align:center;margin-top:6px;font-size:12px;color:var(--t4)">Kode OTP berlaku selama 5 menit</div>
+      <div class="toggle-row">
+        <label class="ios-sw">
+          <input type="checkbox" id="rememberMe">
+          <div class="sw-track"></div>
+          <div class="sw-thumb"></div>
+        </label>
+        <span class="toggle-lbl">Ingat akun di perangkat ini</span>
       </div>
     </div>
+    <button class="login-btn" onclick="doLogin()">Masuk</button>
+    <button onclick="openModal('mRegister')" style="width:100%;padding:11px;background:none;border:1px solid var(--line1);border-radius:10px;color:var(--t2);font-size:15px;cursor:pointer;margin-top:8px;transition:all .15s;" onmouseover="this.style.borderColor='var(--blue)';this.style.color='var(--blue)'" onmouseout="this.style.borderColor='var(--line1)';this.style.color='var(--t2)'">📝 Daftar Akun Baru</button>
 
     <div class="login-foot">CLICK v2.1 · PT PII · General Affair</div>
   </div>
@@ -1652,107 +1639,68 @@ function openLightbox(el){
 function closeLightbox(){document.getElementById('lightbox').classList.remove('open');}
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeLightbox();});
 
-function populateLoginDropdown(){}
-let _otpEmail='';
-function backToEmailStep(){
-  document.getElementById('loginStep1').style.display='block';
-  document.getElementById('loginStep2').style.display='none';
-  showLoginErr('');
-  setTimeout(()=>document.getElementById('loginEmail').focus(),80);
+function populateLoginDropdown(){return; //
+  const sel=document.getElementById('loginUser');if(!sel)return;
+  const users=[{id:1,nama:'Ricky',role:'manager'},{id:2,nama:'Budi Santoso',role:'supervisor'},{id:3,nama:'Dewi Kusuma',role:'supervisor'},{id:4,nama:'Siti Rahayu',role:'staff'},{id:5,nama:'Agus Setiawan',role:'staff'},{id:6,nama:'Ratna Dewi',role:'staff'},{id:7,nama:'Admin',role:'admin'}];
+  const ico={manager:'👔',coordinator:'📋',supervisor:'🔍',internal:'🧹',staff:'🧹',admin:'⚙️'};
+  sel.innerHTML='<option value="">— Pilih Nama —</option>'+users.map(u=>`<option value="${u.id}">${ico[u.role]} ${u.nama} (${u.role})</option>`).join('');
+  const g=document.getElementById('demoGrid');if(!g)return;
+  const demos=[{id:1,label:'👔 Ricky',sub:'Manager',pin:'1234'},{id:2,label:'🔍 Budi Santoso',sub:'Supervisor',pin:'2222'},{id:3,label:'🔍 Dewi Kusuma',sub:'Supervisor',pin:'3333'},{id:4,label:'🧹 Siti Rahayu',sub:'General Service',pin:'4444'},{id:5,label:'🧹 Agus Setiawan',sub:'General Service',pin:'5555'},{id:7,label:'⚙️ Admin',sub:'Admin',pin:'0000'}];
+  g.innerHTML=demos.map(d=>`<button onclick="quickLogin(${d.id},'${d.pin}')" style="display:flex;align-items:center;justify-content:space-between;width:100%;padding:9px 11px;background:var(--bg3);border:1px solid var(--line1);border-radius:8px;cursor:pointer;" onmouseover="this.style.background='var(--bg4)'" onmouseout="this.style.background='var(--bg3)'"><span style="color:var(--t1);font-size:15px">${d.label} <span style="color:var(--t3);font-size:13px">${d.sub}</span></span><span style="color:var(--blue);font-size:14px;font-weight:600">PIN ${d.pin} →</span></button>`).join('');
 }
+function quickLogin(uid,pin){document.getElementById('loginUser').value=uid;document.getElementById('loginPin').value=pin;doLogin();}
+function togglePin(){const i=document.getElementById('loginPin'),b=document.getElementById('pinEye');i.type=i.type==='password'?'text':'password';b.textContent=i.type==='password'?'👁':'🙈';}
 function checkRemembered(){
-  const s=DB.get('rememberedUser');if(!s||!s.email)return;
+  const s=DB.get('rememberedUser');if(!s||!s.id)return;
   const av={manager:'👔',coordinator:'📋',supervisor:'🔍',internal:'🛠',staff:'🧹',admin:'⚙️'};
   const rc={manager:['var(--purple-f)','var(--purple)'],coordinator:['var(--blue-f)','var(--blue)'],supervisor:['var(--green-f)','var(--green)'],internal:['var(--green-f)','var(--green)'],staff:['var(--green-f)','var(--green)'],admin:['var(--orange-f)','var(--orange)']};
   const[bg,col]=rc[s.role]||['var(--bg5)','var(--t2)'];
   document.getElementById('remAv').textContent=av[s.role]||'👤';
   document.getElementById('remAv').style.background=bg;
   document.getElementById('remName').textContent=s.nama;
-  document.getElementById('remEmail').textContent=s.email;
-  const rb=document.getElementById('remBadge');rb.textContent=(s.role||'').toUpperCase();rb.style.cssText=`background:${bg};color:${col};`;
+  document.getElementById('remEmail').textContent=s.role.toUpperCase();
+  const rb=document.getElementById('remBadge');rb.textContent=s.role.toUpperCase();rb.style.cssText=`background:${bg};color:${col};`;
   document.getElementById('remBox').style.display='block';
   document.getElementById('loginForm').style.display='none';
 }
-function useRemembered(){
-  const s=DB.get('rememberedUser');if(!s)return;
-  document.getElementById('loginEmail').value=s.email||'';
-  document.getElementById('remBox').style.display='none';
-  document.getElementById('loginForm').style.display='block';
-  document.getElementById('loginStep1').style.display='block';
-  document.getElementById('loginStep2').style.display='none';
-  if(s.email) setTimeout(()=>requestOTP(),100);
-}
-function clearRemembered(){
-  DB.set('rememberedUser',null);
-  document.getElementById('remBox').style.display='none';
-  document.getElementById('loginForm').style.display='block';
-  backToEmailStep();
-}
+function useRemembered(){const s=DB.get('rememberedUser');if(!s)return;document.getElementById('loginUser').value=s.nama||'';document.getElementById('loginForm').style.display='block';document.getElementById('remBox').style.display='none';setTimeout(()=>document.getElementById('loginPin').focus(),80);}
+function clearRemembered(){DB.set('rememberedUser',null);document.getElementById('remBox').style.display='none';document.getElementById('loginForm').style.display='block';}
 function showLoginErr(msg){
   let el=document.getElementById('loginErrMsg');
   if(!el){
     el=document.createElement('div');
     el.id='loginErrMsg';
-    el.style.cssText='font-size:14px;text-align:center;margin-top:8px;min-height:18px;color:var(--red);';
-    const step2=document.getElementById('loginStep2');
-    if(step2) step2.appendChild(el);
+    el.style.cssText='font-size:15px;text-align:center;margin-top:6px;min-height:18px;color:var(--red);';
+    const btn=document.querySelector('.login-btn');
+    if(btn)btn.parentNode.insertBefore(el,btn.nextSibling);
   }
   el.textContent=msg;
 }
-async function requestOTP(resend=false){
-  const email=document.getElementById('loginEmail').value.trim().toLowerCase();
-  if(!email||!email.includes('@')){showToast('⚠ Masukkan email Google yang valid');return;}
-  const btn=document.getElementById('btnKirimOTP');
-  if(btn){btn.textContent='🔄 Mengirim...';btn.disabled=true;}
+async function doLogin(){
+  const nama=document.getElementById('loginUser').value.trim();
+  const pin=document.getElementById('loginPin').value.trim();
+  if(!nama){showToast('⚠ Masukkan nama Anda');return;}
+  if(pin.length!==4){showToast('⚠ PIN harus 4 digit');return;}
+  if(SCRIPT_URL){showLoginErr('🔄 Menghubungkan ke server...'); try{await syncFromServer();}catch(e){} showLoginErr('');}
+  let k=DB.get('karyawan')||[];
+  if(!k.length){DB.init();k=DB.get('karyawan')||[];}
+  const u=k.find(x=>x.nama.toLowerCase()===nama.toLowerCase()&&x.pin===pin&&(x.status==='active'||x.aktif===true));
+  if(!u){showLoginErr('❌ Nama atau PIN salah');return;}
   showLoginErr('');
-  try{
-    const res=await apiCall({action:'requestOTP',email});
-    if(res&&res.ok){
-      _otpEmail=email;
-      document.getElementById('loginStep1').style.display='none';
-      document.getElementById('loginStep2').style.display='block';
-      document.getElementById('otpEmailDisplay').textContent=email;
-      document.getElementById('loginOTP').value='';
-      setTimeout(()=>document.getElementById('loginOTP').focus(),80);
-      if(resend) showToast('✅ OTP baru telah dikirim ke email Anda');
-    }else{
-      showToast('❌ '+(res?.message||'Email tidak terdaftar atau tidak aktif'));
-    }
-  }catch(e){showToast('❌ Gagal menghubungi server');}
-  finally{if(btn){btn.textContent='Kirim OTP';btn.disabled=false;}}
-}
-async function verifyOTP(){
-  const otp=document.getElementById('loginOTP').value.trim();
-  if(otp.length!==6){showToast('⚠ Masukkan kode OTP 6 digit');return;}
-  const btn=document.getElementById('btnVerifOTP');
-  if(btn){btn.textContent='🔄 Memverifikasi...';btn.disabled=true;}
-  showLoginErr('');
-  try{
-    const res=await apiCall({action:'verifyOTP',email:_otpEmail,otp});
-    if(res&&res.user){
-      const u=res.user;
-      if(u.role) u.role=u.role.toLowerCase();
-      if(document.getElementById('rememberMe').checked) DB.set('rememberedUser',{id:u.id,nama:u.nama,role:u.role,email:_otpEmail});
-      sessionStorage.setItem('click_session',JSON.stringify({id:u.id,nama:u.nama,role:u.role,email:_otpEmail}));
-      CU=u;loadApp();
-    }else{
-      showLoginErr('❌ '+(res?.message||'Kode OTP salah atau sudah kadaluarsa'));
-      document.getElementById('loginOTP').value='';
-      setTimeout(()=>document.getElementById('loginOTP').focus(),80);
-    }
-  }catch(e){showLoginErr('❌ Gagal menghubungi server');}
-  finally{if(btn){btn.textContent='Verifikasi & Masuk';btn.disabled=false;}}
+  if(document.getElementById('rememberMe').checked) DB.set('rememberedUser',{id:u.id,nama:u.nama,role:u.role});
+  // Simpan session aktif — untuk auto-login saat refresh
+  sessionStorage.setItem('click_session', JSON.stringify({id:u.id,nama:u.nama,role:u.role,pin:u.pin}));
+  CU=u;loadApp();
 }
 function doLogout(){
-  stopPolling();
+  stopPolling(); // hentikan polling saat logout
   _lastPollData={pending:0,tugasBaru:0,verifBaru:0,klaimBaru:0};
-  sessionStorage.removeItem('click_session');
-  CU=null;_otpEmail='';
+  sessionStorage.removeItem('click_session'); // hapus session
+  CU=null;
   document.getElementById('pgApp').classList.remove('active');
   document.getElementById('pgLogin').classList.add('active');
-  document.getElementById('loginEmail').value='';
-  document.getElementById('loginOTP').value='';
-  backToEmailStep();
+  document.getElementById('loginPin').value='';
+  document.getElementById('loginUser').value='';
   checkRemembered();
 }
 
@@ -4663,16 +4611,20 @@ function appInit(){
   if(sess){
     try{
       const s = JSON.parse(sess);
-      if(s.id && s.nama && s.role){
-        CU=s;
+      // Validasi user masih ada di database
+      const k = DB.get('karyawan')||[];
+      const u = k.find(x=>x.id===s.id&&(x.status==='active'||x.aktif===true));
+      if(u){
+        CU=u;
+        // Sync dari server lalu masuk app
         if(SCRIPT_URL){ syncFromServer().catch(()=>{}).finally(()=>{loadApp();}); }
         else { loadApp(); }
-        return;
+        return; // skip halaman login
       }
     }catch(e){}
     sessionStorage.removeItem('click_session');
   }
-  checkRemembered();checkMobile();window.addEventListener('resize',checkMobile);autoBreachCheck();
+  checkRemembered();populateLoginDropdown();checkMobile();window.addEventListener('resize',checkMobile);autoBreachCheck();
 }
 if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',appInit);}else{appInit();}
 </script>
